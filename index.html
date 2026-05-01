@@ -663,7 +663,17 @@
                 style="color: rgba(255, 255, 255, 0.5);">IDLE</span></div>
         <div class="hud-row"><span>Active Voices</span> <span class="hud-val highlight" id="hud-voices">0</span></div>
         <div class="hud-row"><span>Dust Particulates</span> <span class="hud-val" id="hud-dust">0</span></div>
-        <button class="btn btn-outline btn-small" id="aiAnalyzeBtn" style="width: 100%; margin-top: 12px; font-size: 0.7rem;">✨ ANALYZE SECTOR</button>
+        
+        <hr class="hud-divider" style="margin-top: 10px;">
+        <div style="margin-top: 5px; display:flex; flex-direction:column; gap:6px;">
+            <span style="font-size: 0.68rem; color: rgba(255,255,255,0.8);">✨ LLM OVERRIDES</span>
+            <input type="text" id="aiMoodInput" placeholder="e.g. 'Haunted ruins'" style="width: 100%; box-sizing: border-box; background: rgba(0,0,0,0.5); border: 1px solid rgba(255,85,0,0.2); color: white; padding: 6px 8px; border-radius: 4px; font-size: 0.7rem; outline: none; font-family: inherit;">
+            <div style="display: flex; gap: 4px;">
+                <button class="btn btn-small" id="aiComposeBtn" style="margin: 0; padding: 6px 4px; font-size: 0.6rem;">✨ TUNE</button>
+                <button class="btn btn-small" id="aiRadioBtn" style="margin: 0; padding: 6px 4px; font-size: 0.6rem;">✨ RADIO</button>
+                <button class="btn btn-small" id="aiAnalyzeBtn" style="margin: 0; padding: 6px 4px; font-size: 0.6rem;">✨ LOG</button>
+            </div>
+        </div>
     </div>
 
     <!-- AI Output Terminal -->
@@ -792,6 +802,7 @@
         const activeDustVelocities = new Float32Array(maxInteractiveDust * 3);
         const activeDustLifetimes = new Float32Array(maxInteractiveDust);
         let activeDustIndex = 0;
+        let ambientRandomness; // Added for ambient dust tonalities
 
         // Ambient Audio Engine
         let audioCtx, masterGain, masterDelay, delayFeedback;
@@ -825,20 +836,21 @@
         ];
 
         // Sound Profiles & Visual Palettes per number, mapped to Martian Sunset theme
+        // AUDIO UPDATE: Changed waveforms to 'triangle' and 'sine' for a calm, subtle Piazzolla string/bandoneon feel.
         const audioProfiles = {
-            10: { name: 'Solar Flare (Lydian)', scale: [130.81, 146.83, 164.81, 185.00, 196.00, 220.00, 246.94, 261.63, 293.66, 329.63], drone: 'sawtooth', pluck: 'square', colors: { g1: '#1a0500', g2: '#330a00', edge: '#ff3300', peak: '#ffcc00' } },
-            9:  { name: 'Dune Sea (Mixolydian)', scale: [146.83, 164.81, 174.61, 196.00, 220.00, 246.94, 261.63, 293.66, 329.63, 349.23], drone: 'square', pluck: 'sawtooth', colors: { g1: '#1a0005', g2: '#330011', edge: '#ff0055', peak: '#ffaa00' } },
-            8:  { name: 'Crimson Horizon (Phrygian)', scale: [164.81, 174.61, 196.00, 220.00, 246.94, 261.63, 293.66, 329.63, 349.23, 392.00], drone: 'sawtooth', pluck: 'square', colors: { g1: '#140014', g2: '#2a002a', edge: '#d400ff', peak: '#ff55aa' } },
+            10: { name: 'Solar Flare (Lydian)', scale: [130.81, 146.83, 164.81, 185.00, 196.00, 220.00, 246.94, 261.63, 293.66, 329.63], drone: 'triangle', pluck: 'sine', colors: { g1: '#1a0500', g2: '#330a00', edge: '#ff3300', peak: '#ffcc00' } },
+            9:  { name: 'Dune Sea (Mixolydian)', scale: [146.83, 164.81, 174.61, 196.00, 220.00, 246.94, 261.63, 293.66, 329.63, 349.23], drone: 'triangle', pluck: 'sine', colors: { g1: '#1a0005', g2: '#330011', edge: '#ff0055', peak: '#ffaa00' } },
+            8:  { name: 'Crimson Horizon (Phrygian)', scale: [164.81, 174.61, 196.00, 220.00, 246.94, 261.63, 293.66, 329.63, 349.23, 392.00], drone: 'triangle', pluck: 'sine', colors: { g1: '#140014', g2: '#2a002a', edge: '#d400ff', peak: '#ff55aa' } },
             
-            7:  { name: 'Violet Dusk (Minor)', scale: [196.00, 220.00, 233.08, 261.63, 293.66, 311.13, 349.23, 392.00, 440.00, 466.16], drone: 'square', pluck: 'sawtooth', colors: { g1: '#0a001a', g2: '#140033', edge: '#8800ff', peak: '#ff00ff' } },
-            6:  { name: 'Iron Oxide (Harmonic Min.)', scale: [130.81, 146.83, 155.56, 174.61, 196.00, 207.65, 246.94, 261.63, 293.66, 311.13], drone: 'sawtooth', pluck: 'square', colors: { g1: '#1a0a00', g2: '#331400', edge: '#ff5500', peak: '#ff0055' } },
-            5:  { name: 'Gale Crater (Dorian)', scale: [174.61, 196.00, 207.65, 233.08, 261.63, 277.18, 329.63, 349.23, 392.00, 415.30], drone: 'square', pluck: 'sawtooth', colors: { g1: '#220000', g2: '#440000', edge: '#ff2200', peak: '#ffaa55' } },
+            7:  { name: 'Violet Dusk (Minor)', scale: [196.00, 220.00, 233.08, 261.63, 293.66, 311.13, 349.23, 392.00, 440.00, 466.16], drone: 'triangle', pluck: 'sine', colors: { g1: '#0a001a', g2: '#140033', edge: '#8800ff', peak: '#ff00ff' } },
+            6:  { name: 'Iron Oxide (Harmonic Min.)', scale: [130.81, 146.83, 155.56, 174.61, 196.00, 207.65, 246.94, 261.63, 293.66, 311.13], drone: 'triangle', pluck: 'sine', colors: { g1: '#1a0a00', g2: '#331400', edge: '#ff5500', peak: '#ff0055' } },
+            5:  { name: 'Gale Crater (Dorian)', scale: [174.61, 196.00, 207.65, 233.08, 261.63, 277.18, 329.63, 349.23, 392.00, 415.30], drone: 'triangle', pluck: 'sine', colors: { g1: '#220000', g2: '#440000', edge: '#ff2200', peak: '#ffaa55' } },
             
-            4:  { name: 'Olympus Mons (Phrygian Dom.)', scale: [220.00, 233.08, 277.18, 293.66, 329.63, 349.23, 392.00, 440.00, 466.16, 554.37], drone: 'sawtooth', pluck: 'square', colors: { g1: '#1a0005', g2: '#33000a', edge: '#ff0044', peak: '#ff5500' } },
-            3:  { name: 'Midnight Storm (Locrian)', scale: [293.66, 329.63, 369.99, 392.00, 440.00, 493.88, 523.25, 587.33, 659.25, 739.99], drone: 'square', pluck: 'sawtooth', colors: { g1: '#05001a', g2: '#0a0033', edge: '#5500ff', peak: '#aa55ff' } },
+            4:  { name: 'Olympus Mons (Phrygian Dom.)', scale: [220.00, 233.08, 277.18, 293.66, 329.63, 349.23, 392.00, 440.00, 466.16, 554.37], drone: 'triangle', pluck: 'sine', colors: { g1: '#1a0005', g2: '#33000a', edge: '#ff0044', peak: '#ff5500' } },
+            3:  { name: 'Midnight Storm (Locrian)', scale: [293.66, 329.63, 369.99, 392.00, 440.00, 493.88, 523.25, 587.33, 659.25, 739.99], drone: 'triangle', pluck: 'sine', colors: { g1: '#05001a', g2: '#0a0033', edge: '#5500ff', peak: '#aa55ff' } },
             
-            2:  { name: 'Silica Node (Minor Pent.)', scale: [246.94, 293.66, 329.63, 369.99, 440.00, 493.88, 587.33, 659.25, 739.99, 880.00], drone: 'sawtooth', pluck: 'square', colors: { g1: '#1a0a05', g2: '#33140a', edge: '#ff3355', peak: '#ffcc88' } },
-            1:  { name: 'Ares Zenith (Major Pent.)', scale: [440.00, 493.88, 554.37, 659.25, 739.99, 880.00, 987.77, 1108.73, 1318.51, 1479.98], drone: 'square', pluck: 'sawtooth', colors: { g1: '#0a0500', g2: '#1a0a00', edge: '#ff5500', peak: '#ffffaa' } },
+            2:  { name: 'Silica Node (Minor Pent.)', scale: [246.94, 293.66, 329.63, 369.99, 440.00, 493.88, 587.33, 659.25, 739.99, 880.00], drone: 'triangle', pluck: 'sine', colors: { g1: '#1a0a05', g2: '#33140a', edge: '#ff3355', peak: '#ffcc88' } },
+            1:  { name: 'Ares Zenith (Major Pent.)', scale: [440.00, 493.88, 554.37, 659.25, 739.99, 880.00, 987.77, 1108.73, 1318.51, 1479.98], drone: 'triangle', pluck: 'sine', colors: { g1: '#0a0500', g2: '#1a0a00', edge: '#ff5500', peak: '#ffffaa' } },
         };
 
         function init() {
@@ -985,6 +997,8 @@
             // --- AI Features Setup ---
             document.getElementById('aiThemeBtn').addEventListener('click', handleThemeOverride);
             document.getElementById('aiAnalyzeBtn').addEventListener('click', handleAnalyzeSector);
+            document.getElementById('aiComposeBtn').addEventListener('click', handleAudioOverride);
+            document.getElementById('aiRadioBtn').addEventListener('click', handleAudioLog);
             
             document.getElementById('aiLogTerminal').addEventListener('click', function() {
                 this.classList.remove('visible');
@@ -996,26 +1010,17 @@
         // --- GEMINI API INTEGRATION ---
         const apiKey = ""; 
 
-        async function fetchGemini(prompt, systemInstruction = "", expectJson = false) {
+        async function fetchGemini(prompt, systemInstruction = "", jsonSchema = null) {
             const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${apiKey}`;
             const payload = {
                 contents: [{ parts: [{ text: prompt }] }],
                 systemInstruction: { parts: [{ text: systemInstruction }] }
             };
             
-            if (expectJson) {
+            if (jsonSchema) {
                 payload.generationConfig = { 
                     responseMimeType: "application/json",
-                    responseSchema: {
-                        type: "OBJECT",
-                        properties: {
-                            g1: { type: "STRING" },
-                            g2: { type: "STRING" },
-                            edge: { type: "STRING" },
-                            peak: { type: "STRING" }
-                        },
-                        required: ["g1", "g2", "edge", "peak"]
-                    }
+                    responseSchema: jsonSchema
                 };
             }
 
@@ -1045,6 +1050,40 @@
             }
         }
 
+        async function fetchTTS(text, voice = "Charon") {
+            const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-tts:generateContent?key=${apiKey}`;
+            const payload = {
+                contents: [{ parts: [{ text: text }] }],
+                generationConfig: {
+                    responseModalities: ["AUDIO"],
+                    speechConfig: {
+                        voiceConfig: {
+                            prebuiltVoiceConfig: { voiceName: voice }
+                        }
+                    }
+                },
+                model: "gemini-2.5-flash-preview-tts"
+            };
+
+            let retries = 5;
+            let delay = 1000;
+            for (let i = 0; i < retries; i++) {
+                try {
+                    const response = await fetch(url, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(payload)
+                    });
+                    if (!response.ok) throw new Error(await response.text());
+                    return await response.json();
+                } catch (e) {
+                    if (i === retries - 1) throw e;
+                    await new Promise(r => setTimeout(r, delay));
+                    delay *= 2;
+                }
+            }
+        }
+
         async function handleThemeOverride() {
             const inputEl = document.getElementById('aiThemeInput');
             const btnEl = document.getElementById('aiThemeBtn');
@@ -1055,7 +1094,19 @@
             
             try {
                 const systemPrompt = "You are an expert UI/UX color theorist for a futuristic Martian generative art project. Return a JSON object with 4 hex colors based on the user's concept. 'g1' is the darkest rock shadow. 'g2' is the dusty soil background. 'edge' is a vibrant sunset or atmospheric glow. 'peak' is the absolute brightest solar flare/neon color.";
-                const responseText = await fetchGemini(`Generate a desert/martian color palette inspired by: "${themeQuery}"`, systemPrompt, true);
+                
+                const colorSchema = {
+                    type: "OBJECT",
+                    properties: {
+                        g1: { type: "STRING" },
+                        g2: { type: "STRING" },
+                        edge: { type: "STRING" },
+                        peak: { type: "STRING" }
+                    },
+                    required: ["g1", "g2", "edge", "peak"]
+                };
+
+                const responseText = await fetchGemini(`Generate a desert/martian color palette inspired by: "${themeQuery}"`, systemPrompt, colorSchema);
                 
                 const colors = JSON.parse(responseText);
                 
@@ -1073,7 +1124,150 @@
                 console.error("Theme generation failed:", err);
                 inputEl.value = "Error generating theme.";
             } finally {
-                btnEl.innerText = "✨ GENERATE PALETTE";
+                btnEl.innerText = "✨ REWEAVE LATTICE";
+                btnEl.disabled = false;
+            }
+        }
+
+        async function handleAudioOverride() {
+            const inputEl = document.getElementById('aiMoodInput');
+            const btnEl = document.getElementById('aiComposeBtn');
+            const terminalEl = document.getElementById('aiLogTerminal');
+            const textEl = document.getElementById('aiLogText');
+            const mood = inputEl.value.trim() || "A tense standoff in a dust storm";
+
+            btnEl.innerText = "✨ TUNING...";
+            btnEl.disabled = true;
+
+            const audioSchema = {
+                type: "OBJECT",
+                properties: {
+                    name: { type: "STRING" },
+                    scale: { 
+                        type: "ARRAY", 
+                        items: { type: "NUMBER" }, 
+                        description: "Exactly 10 ascending frequencies in Hz representing a musical scale, between 100-1000Hz" 
+                    },
+                    drone: { type: "STRING", enum: ["sine", "square", "sawtooth", "triangle"] },
+                    pluck: { type: "STRING", enum: ["sine", "square", "sawtooth", "triangle"] }
+                },
+                required: ["name", "scale", "drone", "pluck"]
+            };
+
+            try {
+                const systemPrompt = "You are an avant-garde composer for a sci-fi generative audio project. Based on the user's mood, generate a custom musical scale and synth configuration.";
+                const responseText = await fetchGemini(`Compose an acoustic profile for: "${mood}"`, systemPrompt, audioSchema);
+                const audioConfig = JSON.parse(responseText);
+
+                if (audioConfig.scale && audioConfig.scale.length > 0) {
+                    currentAudioProfile.name = audioConfig.name;
+                    currentAudioProfile.scale = audioConfig.scale.slice(0, 10);
+                    while(currentAudioProfile.scale.length < 10) currentAudioProfile.scale.push(currentAudioProfile.scale[currentAudioProfile.scale.length-1] * 1.1);
+                    currentAudioProfile.drone = audioConfig.drone;
+                    currentAudioProfile.pluck = audioConfig.pluck;
+
+                    if (droneOsc) droneOsc.type = currentAudioProfile.drone;
+                    if (droneOsc2) droneOsc2.type = currentAudioProfile.drone;
+
+                    if (hudScaleEl) hudScaleEl.innerText = currentAudioProfile.name;
+                    if (hudFreqEl) hudFreqEl.innerText = `${currentAudioProfile.scale[0].toFixed(1)} Hz`;
+                    if (hudWaveEl) hudWaveEl.innerText = `${currentAudioProfile.drone} / ${currentAudioProfile.pluck}`;
+
+                    textEl.innerText = `SYS_UPDATE: Acoustic profile successfully retuned to "${currentAudioProfile.name}". Scale updated.`;
+                    terminalEl.classList.add('visible');
+                    setTimeout(() => terminalEl.classList.remove('visible'), 5000);
+                }
+            } catch (err) {
+                console.error("Tuning failed:", err);
+                textEl.innerText = "ERR_TUNE: Tuning failure.";
+                terminalEl.classList.add('visible');
+                setTimeout(() => terminalEl.classList.remove('visible'), 3000);
+            } finally {
+                btnEl.innerText = "✨ TUNE";
+                btnEl.disabled = false;
+            }
+        }
+
+        async function handleAudioLog() {
+            const btnEl = document.getElementById('aiRadioBtn');
+            const terminalEl = document.getElementById('aiLogTerminal');
+            const textEl = document.getElementById('aiLogText');
+
+            btnEl.innerText = "✨ RADIO...";
+            btnEl.disabled = true;
+
+            try {
+                // 1. Generate script
+                const inputEl = document.getElementById('aiMoodInput');
+                const mood = inputEl.value.trim() || "Dust storm";
+                const systemPrompt = "You are a lone astronaut on a desolated Mars base. Write a haunting, realistic 2-sentence radio transmission about your current state based on the user's prompt. Sound tired and melancholic. Use no quotes or emojis.";
+                
+                textEl.innerText = "Intercepting radio transmission...";
+                terminalEl.classList.add('visible');
+                
+                const scriptText = await fetchGemini(`Generate a radio log inspired by: ${mood}`, systemPrompt, null);
+
+                textEl.innerText = `RADIO LOG: "${scriptText}"`;
+
+                // 2. Generate Audio TTS
+                const ttsData = await fetchTTS(scriptText, "Charon");
+                const base64Audio = ttsData.candidates[0].content.parts[0].inlineData.data;
+                const mimeType = ttsData.candidates[0].content.parts[0].inlineData.mimeType;
+
+                let sampleRate = 24000;
+                const match = mimeType.match(/rate=(\d+)/);
+                if(match) sampleRate = parseInt(match[1]);
+
+                // 3. Decode L16 to AudioBuffer
+                const binaryString = atob(base64Audio);
+                const numSamples = binaryString.length / 2;
+                
+                // Initialize audio context if suspended
+                if (audioCtx && audioCtx.state === 'suspended') {
+                    await audioCtx.resume();
+                }
+
+                const audioBuffer = audioCtx.createBuffer(1, numSamples, sampleRate);
+                const channelData = audioBuffer.getChannelData(0);
+
+                for (let i = 0; i < numSamples; i++) {
+                    const byte1 = binaryString.charCodeAt(i * 2);
+                    const byte2 = binaryString.charCodeAt(i * 2 + 1);
+                    // L16 is Big Endian
+                    let int16 = (byte1 << 8) | byte2;
+                    if (int16 & 0x8000) int16 = int16 - 0x10000; // Sign extension
+                    channelData[i] = int16 / 32768.0;
+                }
+
+                // 4. Play with a radio effect
+                const source = audioCtx.createBufferSource();
+                source.buffer = audioBuffer;
+
+                // Add radio filter
+                const radioFilter = audioCtx.createBiquadFilter();
+                radioFilter.type = 'bandpass';
+                radioFilter.frequency.value = 1500;
+                radioFilter.Q.value = 1.0;
+
+                source.connect(radioFilter);
+                if (masterDelay) radioFilter.connect(masterDelay); 
+                if (masterGain) radioFilter.connect(masterGain);
+                else radioFilter.connect(audioCtx.destination);
+
+                source.start();
+
+                // Hide terminal after audio finishes (roughly)
+                setTimeout(() => {
+                    terminalEl.classList.remove('visible');
+                }, (numSamples / sampleRate) * 1000 + 4000);
+
+            } catch (err) {
+                console.error("Audio log failed:", err);
+                textEl.innerText = "ERR_RADIO_LOST: Failed to decode transmission. Signal heavily corrupted.";
+                terminalEl.classList.add('visible');
+                setTimeout(() => terminalEl.classList.remove('visible'), 5000);
+            } finally {
+                btnEl.innerText = "✨ RADIO";
                 btnEl.disabled = false;
             }
         }
@@ -1130,28 +1324,56 @@
             const geom = new THREE.BufferGeometry();
             const count = isMobile ? 2500 : 8000; 
             const pos = new Float32Array(count * 3);
+            const ambientColors = new Float32Array(count * 3);
+            ambientRandomness = new Float32Array(count);
+
             for (let i = 0; i < count * 3; i += 3) {
                 pos[i] = (Math.random() - 0.5) * 180; 
                 pos[i + 1] = (Math.random() - 0.5) * 100; 
                 pos[i + 2] = (Math.random() - 0.5) * 35 + 2; 
+                ambientRandomness[i / 3] = Math.random();
             }
             geom.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+            geom.setAttribute('color', new THREE.BufferAttribute(ambientColors, 3));
             
             const mat = new THREE.PointsMaterial({
-                color: 0xffffff, size: 0.6, transparent: true, opacity: 0.95,
-                map: particleTex, blending: THREE.AdditiveBlending, depthWrite: false
+                size: 0.6, transparent: true, opacity: 0.95,
+                map: particleTex, blending: THREE.AdditiveBlending, depthWrite: false,
+                vertexColors: true
             });
             dustParticles = new THREE.Points(geom, mat);
             scene.add(dustParticles);
 
             const interactiveGeom = new THREE.BufferGeometry();
+            const interactiveColors = new Float32Array(maxInteractiveDust * 3);
             interactiveGeom.setAttribute('position', new THREE.BufferAttribute(activeDustPositions, 3));
+            interactiveGeom.setAttribute('color', new THREE.BufferAttribute(interactiveColors, 3));
             const interactiveMat = new THREE.PointsMaterial({
-                color: colorPeak, size: 1.2, transparent: true, opacity: 1.0,
-                map: particleTex, blending: THREE.AdditiveBlending, depthWrite: false
+                size: 1.2, transparent: true, opacity: 1.0,
+                map: particleTex, blending: THREE.AdditiveBlending, depthWrite: false,
+                vertexColors: true
             });
             interactiveDust = new THREE.Points(interactiveGeom, interactiveMat);
             scene.add(interactiveDust);
+        }
+
+        function updateDustColors() {
+            if (!dustParticles) return;
+            const colors = dustParticles.geometry.attributes.color.array;
+            const count = dustParticles.geometry.attributes.position.count;
+            for(let i=0; i<count; i++) {
+                const t = ambientRandomness[i];
+                if (t < 0.35) {
+                    colors[i*3] = colorEdge.r; colors[i*3+1] = colorEdge.g; colors[i*3+2] = colorEdge.b;
+                } else if (t < 0.75) {
+                    colors[i*3] = colorPeak.r; colors[i*3+1] = colorPeak.g; colors[i*3+2] = colorPeak.b;
+                } else {
+                    colors[i*3] = 1.0; 
+                    colors[i*3+1] = colorPeak.g + (1.0 - colorPeak.g) * 0.5; 
+                    colors[i*3+2] = colorPeak.b + (1.0 - colorPeak.b) * 0.5;
+                }
+            }
+            dustParticles.geometry.attributes.color.needsUpdate = true;
         }
 
         function startPreviewSequence() {
@@ -1188,6 +1410,7 @@
             transitionStartTime = performance.now();
             animationStarted = true;
             isPreview = true;
+            updateDustColors();
         }
 
         function startSequence() {
@@ -1674,10 +1897,10 @@
 
                 if (colorFading) {
                     if (mouseLight) mouseLight.color.copy(colorPeak);
-                    if (interactiveDust) interactiveDust.material.color.copy(colorPeak);
                     if (document.getElementById('aiLogTerminal')) {
                         document.getElementById('aiLogTerminal').style.borderColor = `rgb(${colorPeak.r*255}, ${colorPeak.g*255}, ${colorPeak.b*255})`;
                     }
+                    updateDustColors();
                 }
 
                 const speedMultiplier = 1.0 + (currentTurbulence - 1.0) * 0.8;
@@ -1923,9 +2146,10 @@
                             let noteIndex = Math.min(scale.length - 1, noteIdxOffset + Math.floor(Math.random() * (scale.length * 0.6)));
 
                             const freq = scale[noteIndex];
-                            const brightness = 300 + globalBioActivity * 1500 + Math.random() * 500;
+                            // AUDIO UPDATE: Smoother brightness calculation for calmer notes
+                            const brightness = 300 + globalBioActivity * 800 + Math.random() * 400;
                             const pan = (Math.random() * 2) - 1;
-                            const duration = 2.5 + Math.random() * 2.5; 
+                            const duration = 3.5 + Math.random() * 3.5; 
 
                             playPluck(freq, brightness, currentAudioProfile.pluck, pan, duration);
 
@@ -1939,9 +2163,20 @@
                                 activeDustVelocities[dIdx * 3 + 1] = (Math.random() - 0.5) * 0.1;
                                 activeDustVelocities[dIdx * 3 + 2] = Math.random() * 0.1 + 0.1;
 
+                                const iColors = interactiveDust.geometry.attributes.color.array;
+                                const tColor = Math.random();
+                                if (tColor < 0.5) {
+                                    iColors[dIdx * 3] = colorPeak.r; iColors[dIdx * 3 + 1] = colorPeak.g; iColors[dIdx * 3 + 2] = colorPeak.b;
+                                } else {
+                                    iColors[dIdx * 3] = 1.0; 
+                                    iColors[dIdx * 3 + 1] = colorPeak.g + (1.0 - colorPeak.g) * 0.5; 
+                                    iColors[dIdx * 3 + 2] = colorPeak.b + (1.0 - colorPeak.b) * 0.5;
+                                }
+
                                 activeDustLifetimes[dIdx] = 1.0 + Math.random() * 1.5;
                                 activeDustIndex++;
                                 interactiveDust.geometry.attributes.position.needsUpdate = true;
+                                interactiveDust.geometry.attributes.color.needsUpdate = true;
                             }
                         }
 
@@ -1962,17 +2197,20 @@
                                 for (let h = 0; h < hits; h++) {
                                     const pluckIndex = Math.max(0, Math.min(currentAudioProfile.scale.length - 1, noteIndex + Math.floor((Math.random() - 0.5) * 3)));
 
-                                    const brightness = 400 + (Math.max(0, avgY + 25) / 50) * 1500 + (Math.random() * 1000) + (mouseSpeed * 3000);
+                                    // AUDIO UPDATE: Lowered maximum brightness to keep notes dark and muffled (calmer string sound)
+                                    const brightness = 300 + (Math.max(0, avgY + 25) / 50) * 800 + (Math.random() * 500) + (mouseSpeed * 1000);
                                     const panValue = (xNorm * 2) - 1;
 
                                     const cappedSpeed = Math.min(mouseSpeed, 0.5);
-                                    const duration = Math.max(1.5, 3.5 - (cappedSpeed * 2.0));
+                                    // AUDIO UPDATE: Notes sustain significantly longer to overlap into thick chords
+                                    const duration = Math.max(3.0, 6.0 - (cappedSpeed * 2.0));
 
                                     playPluck(currentAudioProfile.scale[pluckIndex], brightness, currentAudioProfile.pluck, panValue, duration);
                                 }
 
                                 let dustToSpawn = Math.min(60, Math.floor(brushIntensity * 2.5));
                                 if (dustToSpawn > 0) {
+                                    const iColors = interactiveDust.geometry.attributes.color.array;
                                     for (let d = 0; d < dustToSpawn; d++) {
                                         let idx = activeDustIndex % maxInteractiveDust;
                                         activeDustPositions[idx * 3] = (avgX) + (Math.random() - 0.5) * 4.0;
@@ -1983,10 +2221,26 @@
                                         activeDustVelocities[idx * 3 + 1] = (mouseWorld.y - lastMouseWorld.y) * 1.5 + (Math.random() - 0.5) * 2.5;
                                         activeDustVelocities[idx * 3 + 2] = Math.random() * 0.8 + 0.4;
 
+                                        const tColor = Math.random();
+                                        if (tColor < 0.3) {
+                                            iColors[idx * 3] = colorEdge.r; iColors[idx * 3 + 1] = colorEdge.g; iColors[idx * 3 + 2] = colorEdge.b;
+                                        } else if (tColor < 0.6) {
+                                            iColors[idx * 3] = colorPeak.r; iColors[idx * 3 + 1] = colorPeak.g; iColors[idx * 3 + 2] = colorPeak.b;
+                                        } else if (tColor < 0.85) {
+                                            iColors[idx * 3] = (colorEdge.r + colorPeak.r) * 0.5;
+                                            iColors[idx * 3 + 1] = (colorEdge.g + colorPeak.g) * 0.5;
+                                            iColors[idx * 3 + 2] = (colorEdge.b + colorPeak.b) * 0.5;
+                                        } else {
+                                            iColors[idx * 3] = 1.0; 
+                                            iColors[idx * 3 + 1] = colorPeak.g + (1.0 - colorPeak.g) * 0.5; 
+                                            iColors[idx * 3 + 2] = colorPeak.b + (1.0 - colorPeak.b) * 0.5;
+                                        }
+
                                         activeDustLifetimes[idx] = 1.0 + Math.random() * 1.2;
                                         activeDustIndex++;
                                     }
                                     interactiveDust.geometry.attributes.position.needsUpdate = true;
+                                    interactiveDust.geometry.attributes.color.needsUpdate = true;
                                 }
 
                                 const panValue = (xNorm * 2) - 1;
@@ -2068,20 +2322,21 @@
             delayFilter.connect(masterDelay);
             masterDelay.connect(masterGain);
 
+            // AUDIO UPDATE: Changed drone to Triangle waves for a warmer, hollow "Bandoneon" reed sound
             droneOsc = audioCtx.createOscillator();
-            droneOsc.type = 'sawtooth';
+            droneOsc.type = 'triangle';
             const oscGain1 = audioCtx.createGain(); oscGain1.gain.value = 0.2;
 
             droneOsc2 = audioCtx.createOscillator();
-            droneOsc2.type = 'sawtooth'; 
-            droneOsc2.detune.value = 15; 
+            droneOsc2.type = 'triangle'; 
+            droneOsc2.detune.value = 15; // Slow beating effect for the bandoneon bellows
             const oscGain2 = audioCtx.createGain(); oscGain2.gain.value = 0.15;
 
             droneGain = audioCtx.createGain();
             droneGain.gain.value = 0;
             droneFilter = audioCtx.createBiquadFilter();
             droneFilter.type = 'lowpass';
-            droneFilter.frequency.value = 250;
+            droneFilter.frequency.value = 150; // Deeper baseline cutoff for calmer background hum
 
             droneOsc.connect(oscGain1); oscGain1.connect(droneFilter);
             droneOsc2.connect(oscGain2); oscGain2.connect(droneFilter);
@@ -2136,10 +2391,11 @@
             }
 
             filter.type = 'lowpass';
-            const clampedBrightness = Math.min(brightness, isMobile ? 1200 : 2000);
+            // AUDIO UPDATE: Heavily clamped brightness to remove harsh synth edges and keep it subtle
+            const clampedBrightness = Math.min(brightness, isMobile ? 800 : 1200);
             filter.frequency.setValueAtTime(clampedBrightness * 0.8, audioCtx.currentTime);
             filter.frequency.exponentialRampToValueAtTime(Math.max(100, clampedBrightness * 0.1), audioCtx.currentTime + duration * 1.5);
-            filter.Q.value = 1.5; 
+            filter.Q.value = 0.8; // Lower resonance to remove sharp whistling sounds
 
             osc.connect(filter);
             filter.connect(gain);
@@ -2151,11 +2407,13 @@
 
             gain.gain.setValueAtTime(0, audioCtx.currentTime);
 
+            // AUDIO UPDATE: Extremely slow, swelling attack (0.8s) to mimic slowly bowing a string
             const peakGain = Math.min(0.035, 0.015 + (brightness / 80000));
-            gain.gain.linearRampToValueAtTime(peakGain, audioCtx.currentTime + 0.35); 
-            gain.gain.exponentialRampToValueAtTime(0.0001, audioCtx.currentTime + duration * 2.0); 
+            gain.gain.linearRampToValueAtTime(peakGain, audioCtx.currentTime + 0.8); 
+            // AUDIO UPDATE: Much longer, smoother decay back to zero
+            gain.gain.exponentialRampToValueAtTime(0.0001, audioCtx.currentTime + duration * 3.0); 
 
-            osc.stop(audioCtx.currentTime + duration * 2.0);
+            osc.stop(audioCtx.currentTime + duration * 3.0);
 
             osc.onended = () => {
                 activePlucks--;
@@ -2181,7 +2439,8 @@
                 panner = audioCtx.createGain();
             }
 
-            osc.type = 'triangle';
+            // AUDIO UPDATE: Changed from triangle to sine for softer, calmer ambient chimes
+            osc.type = 'sine';
 
             const scale = currentAudioProfile ? currentAudioProfile.scale : [261.63, 293.66, 329.63, 392.00, 440.00];
             const overtoneFreq = scale[Math.floor(Math.random() * scale.length)];
@@ -2201,11 +2460,12 @@
 
             gain.gain.setValueAtTime(0, audioCtx.currentTime);
 
+            // AUDIO UPDATE: Slower attack for the chimes to blend them nicely into the background
             const peakGain = Math.min(0.02, intensity * 0.006 + 0.002);
-            gain.gain.linearRampToValueAtTime(peakGain, audioCtx.currentTime + 0.1);
-            gain.gain.exponentialRampToValueAtTime(0.0001, audioCtx.currentTime + 1.5 + Math.random() * 1.5);
+            gain.gain.linearRampToValueAtTime(peakGain, audioCtx.currentTime + 0.5);
+            gain.gain.exponentialRampToValueAtTime(0.0001, audioCtx.currentTime + 1.5 + Math.random() * 2.0);
 
-            osc.stop(audioCtx.currentTime + 3.0);
+            osc.stop(audioCtx.currentTime + 4.0);
 
             osc.onended = () => {
                 activePlucks--;
