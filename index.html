@@ -1,0 +1,2230 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Ares: Martian Sunset Sonification</title>
+    <style>
+        body {
+            margin: 0;
+            overflow: hidden;
+            background-color: #000000;
+            color: #fff;
+            font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
+            -webkit-font-smoothing: antialiased;
+            -moz-osx-font-smoothing: grayscale;
+            font-weight: 700;
+            text-transform: uppercase;
+        }
+
+        canvas {
+            display: block;
+        }
+
+        /* Glassmorphism Base - Darkened for high contrast */
+        .glass-panel {
+            background: rgba(10, 10, 15, 0.65);
+            backdrop-filter: blur(24px);
+            -webkit-backdrop-filter: blur(24px);
+            border: 1px solid rgba(255, 255, 255, 0.15);
+            border-radius: 20px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+            backface-visibility: hidden;
+            -webkit-backface-visibility: hidden;
+            -ms-overflow-style: none;
+            scrollbar-width: none;
+        }
+
+        .glass-panel::-webkit-scrollbar {
+            display: none;
+        }
+
+        /* Intro Modal Overlay */
+        #introModal {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: radial-gradient(circle at center, rgba(30, 15, 0, 0.8) 0%, rgba(0, 0, 0, 1) 100%);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            z-index: 100;
+            transition: opacity 1s ease;
+            cursor: pointer;
+        }
+
+        #introModal:hover .initiate-text {
+            color: #ffaa00;
+        }
+
+        .brutalist-block {
+            text-align: center;
+            color: #fff;
+            font-size: 1rem;
+            line-height: 1.4;
+            letter-spacing: 0.5px;
+            max-width: 650px;
+            padding: 0 20px;
+            text-wrap: balance;
+        }
+
+        .initiate-text {
+            color: rgba(255, 170, 0, 0.5);
+            transition: color 0.3s ease;
+            margin-top: 20px;
+            display: block;
+        }
+
+        .mobile-text {
+            display: none;
+        }
+
+        .modal-content {
+            width: 90%;
+            max-width: 500px;
+            text-align: center;
+            padding: 24px;
+        }
+
+        .modal-content h1 {
+            color: #fff;
+            margin-top: 0;
+            font-size: 2rem;
+            margin-bottom: 16px;
+            letter-spacing: 4px;
+        }
+
+        .modal-content p {
+            line-height: 1.6;
+            color: rgba(255, 255, 255, 0.8);
+            font-size: 1rem;
+            margin-bottom: 20px;
+        }
+
+        /* AI Terminal Log */
+        #aiLogTerminal {
+            position: absolute;
+            bottom: 85px;
+            left: 50%;
+            transform: translateX(-50%) translateY(20px);
+            width: 90%;
+            max-width: 600px;
+            padding: 16px;
+            z-index: 150;
+            border-left: 4px solid #ffaa00;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.4s ease, transform 0.4s ease, border-color 1s ease;
+        }
+
+        #aiLogTerminal.visible {
+            opacity: 1;
+            pointer-events: auto;
+            transform: translateX(-50%) translateY(0);
+        }
+
+        #aiLogTerminal h3 {
+            margin: 0 0 8px 0;
+            font-size: 0.75rem;
+            color: inherit;
+            letter-spacing: 2px;
+            transition: color 1s ease;
+        }
+
+        #aiLogText {
+            margin: 0;
+            font-size: 0.85rem;
+            line-height: 1.5;
+            color: rgba(255, 255, 255, 0.9);
+            font-family: 'Courier New', Courier, monospace;
+            text-transform: none;
+        }
+
+        /* Playback Control Bar */
+        #playbackControls {
+            position: absolute;
+            bottom: 30px;
+            left: 50%;
+            transform: translateX(-50%) translateY(20px);
+            display: flex;
+            gap: 12px;
+            padding: 10px 16px;
+            z-index: 100;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.8s ease, transform 0.8s ease;
+        }
+
+        #playbackControls.visible {
+            opacity: 1;
+            pointer-events: auto;
+            transform: translateX(-50%) translateY(0);
+        }
+
+        .btn-playback {
+            margin: 0;
+            padding: 10px 22px;
+            border-radius: 20px;
+            font-size: 0.75rem;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .btn-playback svg {
+            width: 15px;
+            height: 15px;
+        }
+
+        /* Reference List Style Buttons */
+        .btn {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: 100%;
+            padding: 11px 14px;
+            margin-top: 8px;
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            border-radius: 24px;
+            color: #fff;
+            font-family: inherit;
+            font-size: 1rem;
+            font-weight: 700;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            box-sizing: border-box;
+        }
+
+        .btn:hover {
+            background: rgba(255, 255, 255, 0.15);
+            box-shadow: 0 0 10px rgba(255, 255, 255, 0.2);
+        }
+
+        /* Condensed Inline Buttons */
+        .btn-small {
+            padding: 6px 10px;
+            font-size: 0.65rem;
+            margin-top: 0;
+            flex: 1;
+            border-radius: 16px;
+        }
+
+        /* Audio HUD */
+        #audioHud {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            padding: 19px;
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+            width: 240px;
+            box-sizing: border-box;
+            opacity: 0;
+            pointer-events: none;
+            transform: translateY(10px);
+            transition: opacity 0.8s ease, transform 0.8s ease;
+            z-index: 50;
+            will-change: opacity, transform;
+        }
+
+        #audioHud.visible {
+            opacity: 1;
+            pointer-events: auto;
+            transform: translateY(0);
+        }
+
+        #audioHud h3 {
+            margin: 0 0 10px 0;
+            color: #ff5500;
+            font-size: 0.84rem;
+        }
+
+        .hud-divider {
+            height: 1px;
+            background: rgba(255, 85, 0, 0.15);
+            margin: 6px 0;
+            border: none;
+        }
+
+        .hud-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 0.68rem;
+            color: rgba(255, 200, 150, 0.7);
+        }
+
+        .hud-val {
+            color: #fff;
+            text-align: right;
+        }
+
+        .hud-val.highlight {
+            color: #ffaa00;
+        }
+
+        /* Highlight distinct visually since everything is bold */
+        .bar-bg {
+            width: 80px;
+            height: 6px;
+            background: rgba(255, 85, 0, 0.1);
+            border-radius: 3px;
+            overflow: hidden;
+            position: relative;
+        }
+
+        .bar-fill {
+            height: 100%;
+            background: #ffaa00;
+            width: 0%;
+            transition: width 0.1s ease-out;
+            box-shadow: 0 0 8px #ffaa00;
+        }
+
+        .pan-dot {
+            width: 3px;
+            height: 10px;
+            background: #fff;
+            border-radius: 2px;
+            position: absolute;
+            top: -2px;
+            left: 50%;
+            transform: translateX(-50%);
+            transition: left 0.1s ease-out;
+            box-shadow: 0 0 5px rgba(255, 85, 0, 0.8);
+        }
+
+        /* Top Left Controls */
+        #topLeftControls {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            z-index: 50;
+            opacity: 0;
+            pointer-events: none;
+            transform: translateY(10px);
+            transition: opacity 0.8s ease, transform 0.8s ease;
+            width: 240px;
+            padding: 19px;
+            box-sizing: border-box;
+            will-change: opacity, transform;
+        }
+
+        #topLeftControls.visible {
+            opacity: 1;
+            pointer-events: auto;
+            transform: translateY(0);
+        }
+
+        .control-panel {
+            width: 100%;
+        }
+
+        .control-panel h3 {
+            margin: 0 0 13px 0;
+            color: #ff5500;
+            font-size: 0.84rem;
+            border-bottom: 1px solid rgba(255, 85, 0, 0.15);
+            padding-bottom: 10px;
+        }
+
+        /* Color inputs */
+        .color-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 0.68rem;
+            color: rgba(255, 200, 150, 0.8);
+            margin-bottom: 11px;
+        }
+
+        .color-row input[type="color"] {
+            -webkit-appearance: none;
+            border: 2px solid rgba(255, 85, 0, 0.2);
+            width: 22px;
+            height: 22px;
+            background: none;
+            cursor: pointer;
+            padding: 0;
+            outline: none;
+            border-radius: 11px;
+            overflow: hidden;
+        }
+
+        .color-row input[type="color"]::-webkit-color-swatch-wrapper {
+            padding: 0;
+        }
+
+        .color-row input[type="color"]::-webkit-color-swatch {
+            border: none;
+            border-radius: 11px;
+        }
+
+        /* Slider Styling */
+        .color-row input[type="range"] {
+            -webkit-appearance: none;
+            background: rgba(255, 85, 0, 0.2);
+            height: 4px;
+            border-radius: 2px;
+            outline: none;
+        }
+
+        .color-row input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            background: #ffaa00;
+            cursor: pointer;
+            box-shadow: 0 0 5px rgba(255, 85, 0, 0.5);
+        }
+
+        /* End Sequence Overlay */
+        #fadeOverlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(15, 5, 0, 0.85);
+            backdrop-filter: blur(16px);
+            z-index: 200;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 4s ease;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            flex-direction: column;
+        }
+
+        #fadeOverlay.active {
+            opacity: 1;
+            pointer-events: auto;
+        }
+
+        .fade-content {
+            padding: 40px 60px;
+            opacity: 0;
+            transition: opacity 2s ease 3s;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        #fadeOverlay.active .fade-content {
+            opacity: 1;
+        }
+
+        .fade-content h2 {
+            color: #ff5500;
+            font-size: 1.2rem;
+            font-weight: 500;
+            margin-bottom: 20px;
+            text-align: center;
+            text-transform: uppercase;
+            text-wrap: balance;
+            text-shadow: 0 0 20px rgba(255, 85, 0, 0.5);
+        }
+
+        /* Mobile Hamburger Button */
+        #mobileMenuBtn {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            width: 44px;
+            height: 44px;
+            display: none;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            gap: 5px;
+            cursor: pointer;
+            z-index: 60;
+            opacity: 0;
+            pointer-events: none;
+            transform: translateY(10px);
+            transition: opacity 0.8s ease, transform 0.8s ease, background 0.2s ease;
+            border-radius: 22px;
+            padding: 0;
+            border: 1px solid rgba(255, 85, 0, 0.2);
+            will-change: opacity, transform;
+        }
+
+        #mobileMenuBtn.visible {
+            opacity: 1;
+            pointer-events: auto;
+            transform: translateY(0);
+        }
+
+        #mobileMenuBtn:hover {
+            background: rgba(255, 85, 0, 0.2);
+        }
+
+        .hamburger-bar {
+            width: 18px;
+            height: 2px;
+            background: #fff;
+            border-radius: 2px;
+            transition: 0.3s;
+        }
+
+        .menu-open #mobileMenuBtn .hamburger-bar:nth-child(1) {
+            transform: translateY(7px) rotate(45deg);
+        }
+
+        .menu-open #mobileMenuBtn .hamburger-bar:nth-child(2) {
+            opacity: 0;
+        }
+
+        .menu-open #mobileMenuBtn .hamburger-bar:nth-child(3) {
+            transform: translateY(-7px) rotate(-45deg);
+        }
+
+        /* Responsive Breakpoints */
+        @media (max-width: 900px) {
+            #mobileMenuBtn {
+                display: flex;
+            }
+
+            .desktop-text {
+                display: none;
+            }
+
+            .mobile-text {
+                display: inline;
+            }
+
+            #topLeftControls {
+                top: 80px;
+                left: 50%;
+                right: auto;
+                width: calc(100% - 40px);
+                max-width: 400px;
+                max-height: calc(50vh - 50px);
+                overflow-y: auto;
+                transform: translateX(-50%) translateY(0);
+            }
+
+            #audioHud {
+                top: auto;
+                bottom: 20px;
+                left: 50%;
+                right: auto;
+                width: calc(100% - 40px);
+                max-width: 400px;
+                max-height: calc(50vh - 30px);
+                overflow-y: auto;
+                transform: translateX(-50%) translateY(0);
+            }
+
+            #topLeftControls.visible {
+                opacity: 0;
+                pointer-events: none;
+                transform: translateX(-50%) translateY(-15px);
+            }
+
+            #audioHud.visible {
+                opacity: 0;
+                pointer-events: none;
+                transform: translateX(-50%) translateY(15px);
+            }
+
+            body.menu-open #topLeftControls.visible,
+            body.menu-open #audioHud.visible {
+                opacity: 1;
+                pointer-events: auto;
+                transform: translateX(-50%) translateY(0);
+            }
+        }
+
+        @media (max-height: 700px) and (max-width: 900px) {
+            #topLeftControls {
+                top: 70px;
+                gap: 8px;
+                padding: 14px;
+            }
+
+            #audioHud {
+                bottom: 10px;
+                padding: 14px;
+                gap: 4px;
+            }
+
+            .control-panel {
+                padding: 0;
+            }
+
+            .color-row {
+                margin-bottom: 6px;
+            }
+
+            .hud-divider {
+                margin: 4px 0;
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <div id="introModal">
+        <div class="brutalist-block">
+            ARES: DUST & DUSK<br><br>
+            A FUTURISTIC MARTIAN AUDIO-VISUAL EXPERIENCE. WATCH AS DUST SPIRES EVOLVE IN THE SUNSET. HOVER GENTLY OVER SILICA NODES TO INFLUENCE THE SOLAR WINDS.<br><br>
+            <span class="initiate-text desktop-text">CLICK ANYWHERE TO LAND.</span>
+            <span class="initiate-text mobile-text">TAP ANYWHERE TO LAND.</span>
+        </div>
+    </div>
+
+    <!-- Mobile Menu Toggle -->
+    <button id="mobileMenuBtn" class="glass-panel">
+        <div class="hamburger-bar"></div>
+        <div class="hamburger-bar"></div>
+        <div class="hamburger-bar"></div>
+    </button>
+
+    <div id="topLeftControls" class="glass-panel">
+        <div class="control-panel">
+            <h3 id="uiTitleLeft">Atmospheric Parameters</h3>
+            <div class="color-row"><span>Dune Shadow</span><input type="color" id="colGrnd1" value="#1a0500"></div>
+            <div class="color-row"><span>Martian Soil</span><input type="color" id="colGrnd2" value="#330a00"></div>
+            <div class="color-row"><span>Solar Flare</span><input type="color" id="colEdge" value="#ff3300"></div>
+            <div class="color-row"><span>Sunset Peak</span><input type="color" id="colPeak" value="#ffcc00"></div>
+            <div class="color-row" style="margin-top: 15px;">
+                <span>Zoom (Z)</span>
+                <input type="range" id="camZSlider" min="10" max="100" step="1" value="44"
+                    style="flex:1; min-width: 0; margin: 0 10px;">
+                <span id="camZValue" style="width: 25px; text-align: right;">44</span>
+            </div>
+            <div class="color-row">
+                <span>Turbulence</span>
+                <input type="range" id="turbulenceSlider" min="0" max="3" step="0.1" value="1.0"
+                    style="flex:1; min-width: 0; margin: 0 10px;">
+                <span id="turbulenceValue" style="width: 25px; text-align: right;">1.0</span>
+            </div>
+            <div class="color-row">
+                <span>Spire Height</span>
+                <input type="range" id="heightSlider" min="0.5" max="1.5" step="0.1" value="1.0"
+                    style="flex:1; min-width: 0; margin: 0 10px;">
+                <span id="heightValue" style="width: 25px; text-align: right;">1.0</span>
+            </div>
+            
+            <hr class="hud-divider" style="margin-top: 15px;">
+            <div style="margin-top: 10px;">
+                <span style="font-size: 0.68rem; color: rgba(255,255,255,0.8);">✨ AI THEME OVERRIDE</span>
+                <input type="text" id="aiThemeInput" placeholder="e.g. 'Neon dust storm'" style="width: 100%; box-sizing: border-box; background: rgba(0,0,0,0.5); border: 1px solid rgba(255,255,255,0.2); color: white; padding: 6px 8px; border-radius: 4px; font-size: 0.7rem; margin-top: 6px; outline: none; font-family: inherit;">
+                <button class="btn btn-small" id="aiThemeBtn" style="margin-top: 8px;">✨ REWEAVE LATTICE</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="fadeOverlay">
+        <div class="fade-content">
+            <h2>SOL CYCLE COMPLETE</h2>
+            <button class="btn" id="finalRestartBtn">RESTART ROVER</button>
+        </div>
+    </div>
+
+    <div id="audioHud" class="glass-panel">
+        <h3 id="uiTitleRight">Rover Telemetry</h3>
+        <div class="hud-row"><span>Sol Cycle</span> <span class="hud-val highlight" id="hud-gen">-</span></div>
+        <div class="hud-row"><span>Scale</span> <span class="hud-val" id="hud-scale">-</span></div>
+        <div class="hud-row"><span>Root Freq</span> <span class="hud-val" id="hud-freq">-</span></div>
+        <div class="hud-row"><span>Waveform</span> <span class="hud-val" id="hud-wave">-</span></div>
+        <hr class="hud-divider">
+        <div class="hud-row"><span>Solar Wind</span>
+            <div class="bar-bg">
+                <div class="bar-fill" id="hud-bio"></div>
+            </div>
+        </div>
+        <div class="hud-row"><span>Wind Velocity</span> <span class="hud-val" id="hud-speed">0%</span></div>
+        <div class="hud-row"><span>Resonance</span>
+            <div class="bar-bg">
+                <div class="bar-fill" id="hud-resonance"></div>
+            </div>
+        </div>
+        <div class="hud-row"><span>Radar Cutoff</span> <span class="hud-val" id="hud-cutoff">300 Hz</span></div>
+        <div class="hud-row"><span>Stereo Field</span>
+            <div class="bar-bg">
+                <div class="pan-dot" id="hud-pan"></div>
+            </div>
+        </div>
+        <hr class="hud-divider">
+        <div class="hud-row"><span>Silica Strikes</span> <span class="hud-val" id="hud-plucks"
+                style="color: rgba(255, 255, 255, 0.5);">IDLE</span></div>
+        <div class="hud-row"><span>Active Voices</span> <span class="hud-val highlight" id="hud-voices">0</span></div>
+        <div class="hud-row"><span>Dust Particulates</span> <span class="hud-val" id="hud-dust">0</span></div>
+        <button class="btn btn-outline btn-small" id="aiAnalyzeBtn" style="width: 100%; margin-top: 12px; font-size: 0.7rem;">✨ ANALYZE SECTOR</button>
+    </div>
+
+    <!-- AI Output Terminal -->
+    <div id="aiLogTerminal" class="glass-panel">
+        <h3 id="uiTitleTerminal">✨ ARES SYS_LOG</h3>
+        <p id="aiLogText">Awaiting geometric analysis...</p>
+    </div>
+
+    <!-- Main Playback Controls -->
+    <div id="playbackControls" class="glass-panel">
+        <button class="btn btn-playback" id="mainRestartBtn">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg>
+            RESTART
+        </button>
+        <button class="btn btn-playback" id="mainPauseBtn">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/></svg>
+            PAUSE
+        </button>
+        <button class="btn btn-playback" id="mainMuteBtn">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07"/></svg>
+            MUTE
+        </button>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script>
+        let scene, camera, renderer;
+        let stalkMesh, tipMesh;
+
+        const isMobile = window.innerWidth <= 900 || /Mobi|Android/i.test(navigator.userAgent);
+
+        // Configuration
+        const gridCols = isMobile ? 280 : 300; 
+        const gridRows = isMobile ? 140 : 150;
+        const stalksPerCell = 4; 
+        const totalCount = gridCols * gridRows * stalksPerCell;
+        const groundWidth = 180; 
+        const groundHeight = 90; 
+
+        // Shared data arrays for all instances
+        const positions = new Float32Array(totalCount * 3);
+        const baseEulers = new Float32Array(totalCount * 3); 
+
+        const startScales = new Float32Array(totalCount);
+        const targetScales = new Float32Array(totalCount);
+
+        const noiseValues = new Float32Array(totalCount); 
+        const illumination = new Float32Array(totalCount); 
+        const bends = new Float32Array(totalCount * 2); 
+
+        const delays = new Float32Array(totalCount);
+
+        // Shader Uniforms
+        const shaderUniforms = {
+            uTime: { value: 0 },
+            uNow: { value: 0 },
+            uHeightFactor: { value: 1.0 },
+            uTurbulence: { value: 1.0 },
+            uPlantWavePhase: { value: 0 },
+            uGlobalBioActivity: { value: 0 },
+            uColorGrnd1: { value: new THREE.Color(0x1a0500) },
+            uColorGrnd2: { value: new THREE.Color(0x330a00) },
+            uColorEdge: { value: new THREE.Color(0xff3300) },
+            uColorPeak: { value: new THREE.Color(0xffcc00) }
+        };
+
+        let currentNumber = 10;
+        let transitionStartTime = 0;
+        let animationStarted = false;
+        let isCountdownPaused = false;
+        let isSequenceComplete = false;
+        let isPreview = false;
+        const DURATION_PER_NUMBER = 3500; // SPEED UPDATE: Reduced from 6000ms to 3500ms for a snappy countdown
+
+        let userTargetZ = null; 
+        let targetTurbulence = 1.0;
+        let currentTurbulence = 1.0; 
+        let heightFactor = isMobile ? 0.6 : 1.0; 
+        let plantWavePhase = 0; 
+        let lastFrameTime = performance.now();
+        let hasActiveBends = false; 
+        let hasActiveIllum = false;
+        
+        let lastKnownResonance = 0; 
+
+        // Responsive camera helpers
+        function getInitialZ() {
+            return 44;
+        }
+
+        function getTargetZ() {
+            return getInitialZ() - 5;
+        }
+
+        // Mouse raycasting
+        const mouse = new THREE.Vector2(-1000, -1000);
+        const mouseWorld = new THREE.Vector3();
+        const lastMouseWorld = new THREE.Vector3(); 
+        const raycaster = new THREE.Raycaster();
+        const plane = new THREE.Plane(new THREE.Vector3(0, 0, 1), 0);
+
+        const canvasSize = 512;
+        const offCanvas = document.createElement('canvas');
+        offCanvas.width = canvasSize; offCanvas.height = canvasSize;
+        const ctx = offCanvas.getContext('2d', { willReadFrequently: true });
+
+        // Dynamic palettes mapped to each generation
+        const colorGrnd1 = new THREE.Color(0x1a0500);
+        const colorGrnd2 = new THREE.Color(0x330a00);
+        const colorEdge = new THREE.Color(0xff3300);
+        const colorPeak = new THREE.Color(0xffcc00);
+
+        // Target colors to allow for smooth, gradual fading
+        const targetColorGrnd1 = new THREE.Color(0x1a0500);
+        const targetColorGrnd2 = new THREE.Color(0x330a00);
+        const targetColorEdge = new THREE.Color(0xff3300);
+        const targetColorPeak = new THREE.Color(0xffcc00);
+
+        // Depth Lighting & Particles
+        let mouseLight;
+        let dustParticles;
+        let interactiveDust;
+
+        const maxInteractiveDust = isMobile ? 1000 : 3000;
+        const activeDustPositions = new Float32Array(maxInteractiveDust * 3).fill(9999); 
+        const activeDustVelocities = new Float32Array(maxInteractiveDust * 3);
+        const activeDustLifetimes = new Float32Array(maxInteractiveDust);
+        let activeDustIndex = 0;
+
+        // Ambient Audio Engine
+        let audioCtx, masterGain, masterDelay, delayFeedback;
+        let droneOsc, droneOsc2, droneGain, droneFilter; 
+        let audioEnabled = false;
+        let currentAudioProfile;
+        let pluckTimer;
+        let activePlucks = 0; 
+        const maxVoices = isMobile ? 14 : 32; 
+        let isMuted = false;
+
+        // Cached HUD elements
+        const hudBioEl = document.getElementById('hud-bio');
+        const hudResEl = document.getElementById('hud-resonance');
+        const hudSpeedEl = document.getElementById('hud-speed');
+        const hudCutoffEl = document.getElementById('hud-cutoff');
+        const hudPanEl = document.getElementById('hud-pan');
+        const hudVoicesEl = document.getElementById('hud-voices');
+        const hudDustEl = document.getElementById('hud-dust');
+        const hudGenEl = document.getElementById('hud-gen');
+        const hudScaleEl = document.getElementById('hud-scale');
+        const hudFreqEl = document.getElementById('hud-freq');
+        const hudWaveEl = document.getElementById('hud-wave');
+        const hudPlucksEl = document.getElementById('hud-plucks');
+
+        // Dynamic UI colors
+        const uiTitles = [
+            document.getElementById('uiTitleLeft'),
+            document.getElementById('uiTitleRight'),
+            document.getElementById('uiTitleTerminal')
+        ];
+
+        // Sound Profiles & Visual Palettes per number, mapped to Martian Sunset theme
+        const audioProfiles = {
+            10: { name: 'Solar Flare (Lydian)', scale: [130.81, 146.83, 164.81, 185.00, 196.00, 220.00, 246.94, 261.63, 293.66, 329.63], drone: 'sawtooth', pluck: 'square', colors: { g1: '#1a0500', g2: '#330a00', edge: '#ff3300', peak: '#ffcc00' } },
+            9:  { name: 'Dune Sea (Mixolydian)', scale: [146.83, 164.81, 174.61, 196.00, 220.00, 246.94, 261.63, 293.66, 329.63, 349.23], drone: 'square', pluck: 'sawtooth', colors: { g1: '#1a0005', g2: '#330011', edge: '#ff0055', peak: '#ffaa00' } },
+            8:  { name: 'Crimson Horizon (Phrygian)', scale: [164.81, 174.61, 196.00, 220.00, 246.94, 261.63, 293.66, 329.63, 349.23, 392.00], drone: 'sawtooth', pluck: 'square', colors: { g1: '#140014', g2: '#2a002a', edge: '#d400ff', peak: '#ff55aa' } },
+            
+            7:  { name: 'Violet Dusk (Minor)', scale: [196.00, 220.00, 233.08, 261.63, 293.66, 311.13, 349.23, 392.00, 440.00, 466.16], drone: 'square', pluck: 'sawtooth', colors: { g1: '#0a001a', g2: '#140033', edge: '#8800ff', peak: '#ff00ff' } },
+            6:  { name: 'Iron Oxide (Harmonic Min.)', scale: [130.81, 146.83, 155.56, 174.61, 196.00, 207.65, 246.94, 261.63, 293.66, 311.13], drone: 'sawtooth', pluck: 'square', colors: { g1: '#1a0a00', g2: '#331400', edge: '#ff5500', peak: '#ff0055' } },
+            5:  { name: 'Gale Crater (Dorian)', scale: [174.61, 196.00, 207.65, 233.08, 261.63, 277.18, 329.63, 349.23, 392.00, 415.30], drone: 'square', pluck: 'sawtooth', colors: { g1: '#220000', g2: '#440000', edge: '#ff2200', peak: '#ffaa55' } },
+            
+            4:  { name: 'Olympus Mons (Phrygian Dom.)', scale: [220.00, 233.08, 277.18, 293.66, 329.63, 349.23, 392.00, 440.00, 466.16, 554.37], drone: 'sawtooth', pluck: 'square', colors: { g1: '#1a0005', g2: '#33000a', edge: '#ff0044', peak: '#ff5500' } },
+            3:  { name: 'Midnight Storm (Locrian)', scale: [293.66, 329.63, 369.99, 392.00, 440.00, 493.88, 523.25, 587.33, 659.25, 739.99], drone: 'square', pluck: 'sawtooth', colors: { g1: '#05001a', g2: '#0a0033', edge: '#5500ff', peak: '#aa55ff' } },
+            
+            2:  { name: 'Silica Node (Minor Pent.)', scale: [246.94, 293.66, 329.63, 369.99, 440.00, 493.88, 587.33, 659.25, 739.99, 880.00], drone: 'sawtooth', pluck: 'square', colors: { g1: '#1a0a05', g2: '#33140a', edge: '#ff3355', peak: '#ffcc88' } },
+            1:  { name: 'Ares Zenith (Major Pent.)', scale: [440.00, 493.88, 554.37, 659.25, 739.99, 880.00, 987.77, 1108.73, 1318.51, 1479.98], drone: 'square', pluck: 'sawtooth', colors: { g1: '#0a0500', g2: '#1a0a00', edge: '#ff5500', peak: '#ffffaa' } },
+        };
+
+        function init() {
+            scene = new THREE.Scene();
+            scene.background = new THREE.Color(0x000000);
+            scene.fog = new THREE.FogExp2(0x000000, 0.015);
+
+            camera = new THREE.PerspectiveCamera(65, window.innerWidth / window.innerHeight, 0.1, 100);
+            camera.position.set(0, 0, getInitialZ());
+
+            renderer = new THREE.WebGLRenderer({ antialias: !isMobile, powerPreference: "high-performance" });
+            renderer.setPixelRatio(isMobile ? Math.min(window.devicePixelRatio, 1.5) : window.devicePixelRatio); 
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            renderer.shadowMap.enabled = true;
+            renderer.shadowMap.type = isMobile ? THREE.BasicShadowMap : THREE.PCFSoftShadowMap;
+            document.body.appendChild(renderer.domElement);
+
+            // Darker, moodier lighting to let the geometric nodes glow
+            const ambientLight = new THREE.AmbientLight(0x2a1000, 0.4);
+            scene.add(ambientLight);
+
+            const hemiLight = new THREE.HemisphereLight(0xffcc00, 0x1a0500, 0.3);
+            scene.add(hemiLight);
+
+            const dirLight = new THREE.DirectionalLight(0xffaa55, 0.6);
+            dirLight.position.set(12, 22, 14);
+            dirLight.castShadow = !isMobile; 
+            if (!isMobile) {
+                dirLight.shadow.mapSize.width = 2048;
+                dirLight.shadow.mapSize.height = 2048;
+                dirLight.shadow.bias = -0.0005;
+            }
+            scene.add(dirLight);
+
+            const rimLight = new THREE.DirectionalLight(0xff5500, 0.5);
+            rimLight.position.set(-15, -10, -5);
+            scene.add(rimLight);
+
+            // Add interactive point light acting as a bright cursor spotlight
+            mouseLight = new THREE.PointLight(colorPeak, 4.0, 90, 2.0);
+            scene.add(mouseLight);
+
+            setupDust();
+            setupGeometry();
+
+            window.addEventListener('resize', onWindowResize, false);
+            window.addEventListener('mousemove', (e) => {
+                mouse.x = (e.clientX / window.innerWidth) * 2 - 1;
+                mouse.y = -(e.clientY / window.innerHeight) * 2 + 1;
+                raycaster.setFromCamera(mouse, camera);
+                raycaster.ray.intersectPlane(plane, mouseWorld);
+            });
+
+            window.addEventListener('touchmove', (e) => {
+                if (e.touches.length > 0) {
+                    mouse.x = (e.touches[0].clientX / window.innerWidth) * 2 - 1;
+                    mouse.y = -(e.touches[0].clientY / window.innerHeight) * 2 + 1;
+                    raycaster.setFromCamera(mouse, camera);
+                    raycaster.ray.intersectPlane(plane, mouseWorld);
+                }
+            }, { passive: true });
+
+            window.addEventListener('touchstart', (e) => {
+                if (e.touches.length > 0) {
+                    mouse.x = (e.touches[0].clientX / window.innerWidth) * 2 - 1;
+                    mouse.y = -(e.touches[0].clientY / window.innerHeight) * 2 + 1;
+                    raycaster.setFromCamera(mouse, camera);
+                    raycaster.ray.intersectPlane(plane, mouseWorld);
+                    lastMouseWorld.copy(mouseWorld);
+                }
+            }, { passive: true });
+
+            document.getElementById('introModal').addEventListener('click', startSequence);
+            document.getElementById('mainRestartBtn').addEventListener('click', restartAnimation);
+            document.getElementById('finalRestartBtn').addEventListener('click', restartAnimation);
+
+            document.getElementById('mobileMenuBtn').addEventListener('click', () => {
+                document.body.classList.toggle('menu-open');
+            });
+
+            document.getElementById('mainPauseBtn').addEventListener('click', (e) => {
+                isCountdownPaused = !isCountdownPaused;
+                if (isCountdownPaused) {
+                    e.currentTarget.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="5 3 19 12 5 21 5 3"/></svg> RESUME`;
+                } else {
+                    e.currentTarget.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/></svg> PAUSE`;
+                }
+            });
+
+            document.getElementById('mainMuteBtn').addEventListener('click', (e) => {
+                isMuted = !isMuted;
+                if (isMuted) {
+                    e.currentTarget.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 5L6 9H2v6h4l5 4V5z"/><line x1="23" y1="9" x2="17" y2="15"/><line x1="17" y1="9" x2="23" y2="15"/></svg> UNMUTE`;
+                } else {
+                    e.currentTarget.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07"/></svg> MUTE`;
+                }
+                if (audioCtx && audioCtx.state === 'suspended') {
+                    audioCtx.resume();
+                }
+                if (masterGain) {
+                    masterGain.gain.setTargetAtTime(isMuted ? 0 : 0.6, audioCtx.currentTime, 0.1);
+                }
+            });
+
+            const bindColor = (id, targetColor) => {
+                document.getElementById(id).addEventListener('input', (e) => {
+                    targetColor.set(e.target.value);
+                });
+            };
+            bindColor('colGrnd1', targetColorGrnd1);
+            bindColor('colGrnd2', targetColorGrnd2);
+            bindColor('colEdge', targetColorEdge);
+            bindColor('colPeak', targetColorPeak);
+
+            const camZSlider = document.getElementById('camZSlider');
+            const camZValue = document.getElementById('camZValue');
+            const initialZ = getInitialZ();
+            camZSlider.value = initialZ;
+            camZValue.innerText = initialZ;
+
+            camZSlider.addEventListener('input', (e) => {
+                userTargetZ = parseFloat(e.target.value);
+                camZValue.innerText = userTargetZ;
+                camera.position.z = userTargetZ;
+            });
+
+            const turbulenceSlider = document.getElementById('turbulenceSlider');
+            const turbulenceValue = document.getElementById('turbulenceValue');
+            turbulenceSlider.addEventListener('input', (e) => {
+                targetTurbulence = parseFloat(e.target.value);
+                turbulenceValue.innerText = targetTurbulence.toFixed(1);
+            });
+
+            const heightSlider = document.getElementById('heightSlider');
+            const heightValue = document.getElementById('heightValue');
+            heightSlider.value = heightFactor;
+            heightValue.innerText = heightFactor.toFixed(1);
+            
+            heightSlider.addEventListener('input', (e) => {
+                heightFactor = parseFloat(e.target.value);
+                heightValue.innerText = heightFactor.toFixed(1);
+            });
+
+            // --- AI Features Setup ---
+            document.getElementById('aiThemeBtn').addEventListener('click', handleThemeOverride);
+            document.getElementById('aiAnalyzeBtn').addEventListener('click', handleAnalyzeSector);
+            
+            document.getElementById('aiLogTerminal').addEventListener('click', function() {
+                this.classList.remove('visible');
+            });
+
+            startPreviewSequence();
+        }
+
+        // --- GEMINI API INTEGRATION ---
+        const apiKey = ""; 
+
+        async function fetchGemini(prompt, systemInstruction = "", expectJson = false) {
+            const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${apiKey}`;
+            const payload = {
+                contents: [{ parts: [{ text: prompt }] }],
+                systemInstruction: { parts: [{ text: systemInstruction }] }
+            };
+            
+            if (expectJson) {
+                payload.generationConfig = { 
+                    responseMimeType: "application/json",
+                    responseSchema: {
+                        type: "OBJECT",
+                        properties: {
+                            g1: { type: "STRING" },
+                            g2: { type: "STRING" },
+                            edge: { type: "STRING" },
+                            peak: { type: "STRING" }
+                        },
+                        required: ["g1", "g2", "edge", "peak"]
+                    }
+                };
+            }
+
+            let retries = 5;
+            let delay = 1000;
+            
+            for (let i = 0; i < retries; i++) {
+                try {
+                    const response = await fetch(url, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(payload)
+                    });
+                    
+                    if (!response.ok) {
+                        const errText = await response.text();
+                        throw new Error(`HTTP error! status: ${response.status}, message: ${errText}`);
+                    }
+                    
+                    const data = await response.json();
+                    return data.candidates?.[0]?.content?.parts?.[0]?.text || "";
+                } catch (e) {
+                    if (i === retries - 1) throw e;
+                    await new Promise(r => setTimeout(r, delay));
+                    delay *= 2;
+                }
+            }
+        }
+
+        async function handleThemeOverride() {
+            const inputEl = document.getElementById('aiThemeInput');
+            const btnEl = document.getElementById('aiThemeBtn');
+            const themeQuery = inputEl.value.trim() || "neon dust storm";
+            
+            btnEl.innerText = "✨ GENERATING...";
+            btnEl.disabled = true;
+            
+            try {
+                const systemPrompt = "You are an expert UI/UX color theorist for a futuristic Martian generative art project. Return a JSON object with 4 hex colors based on the user's concept. 'g1' is the darkest rock shadow. 'g2' is the dusty soil background. 'edge' is a vibrant sunset or atmospheric glow. 'peak' is the absolute brightest solar flare/neon color.";
+                const responseText = await fetchGemini(`Generate a desert/martian color palette inspired by: "${themeQuery}"`, systemPrompt, true);
+                
+                const colors = JSON.parse(responseText);
+                
+                targetColorGrnd1.set(colors.g1);
+                targetColorGrnd2.set(colors.g2);
+                targetColorEdge.set(colors.edge);
+                targetColorPeak.set(colors.peak);
+
+                document.getElementById('colGrnd1').value = colors.g1;
+                document.getElementById('colGrnd2').value = colors.g2;
+                document.getElementById('colEdge').value = colors.edge;
+                document.getElementById('colPeak').value = colors.peak;
+                
+            } catch (err) {
+                console.error("Theme generation failed:", err);
+                inputEl.value = "Error generating theme.";
+            } finally {
+                btnEl.innerText = "✨ GENERATE PALETTE";
+                btnEl.disabled = false;
+            }
+        }
+
+        async function handleAnalyzeSector() {
+            const btnEl = document.getElementById('aiAnalyzeBtn');
+            const terminalEl = document.getElementById('aiLogTerminal');
+            const textEl = document.getElementById('aiLogText');
+            
+            btnEl.innerText = "✨ SCANNING...";
+            btnEl.disabled = true;
+            
+            const currentScaleName = currentAudioProfile ? currentAudioProfile.name : "Unknown";
+            const resLvl = (lastKnownResonance * 100).toFixed(0);
+            const prompt = `Current Sol Cycle: ${currentNumber}. Musical Scale: ${currentScaleName}. Solar Wind Turbulence: ${targetTurbulence.toFixed(1)}. Spire Extension: ${heightFactor.toFixed(1)}. Solar Flare Level: ${resLvl}%.`;
+            
+            try {
+                const systemPrompt = "You are the AI Navigation System of a futuristic Mars Rover (the 'ARES' class). Write a cryptic, poetic, 2-sentence system diagnostic log analyzing the current state provided by the user. Combine sterile geo-technical jargon with expansive, arid desert aesthetics and passionate melancholic tango vibes. Do not use quotes.";
+                const responseText = await fetchGemini(prompt, systemPrompt, false);
+                
+                textEl.innerText = responseText;
+                terminalEl.classList.add('visible');
+                
+                setTimeout(() => {
+                    terminalEl.classList.remove('visible');
+                }, 12000);
+                
+            } catch (err) {
+                console.error("Analysis failed:", err);
+                textEl.innerText = "ERR_SONAR_LOST: The mainframe failed to parse the signal.";
+                terminalEl.classList.add('visible');
+            } finally {
+                btnEl.innerText = "✨ ANALYZE SECTOR";
+                btnEl.disabled = false;
+            }
+        }
+
+        function setupDust() {
+            // Bright white to gold to transparent radial gradient for golden sunburst sparks
+            const canvas = document.createElement('canvas');
+            canvas.width = 64; canvas.height = 64;
+            const ctx = canvas.getContext('2d');
+            
+            const gradient = ctx.createRadialGradient(32, 32, 0, 32, 32, 32);
+            gradient.addColorStop(0, 'rgba(255, 255, 255, 1)');
+            gradient.addColorStop(0.15, 'rgba(255, 220, 50, 1)');
+            gradient.addColorStop(0.4, 'rgba(255, 100, 0, 0.8)');
+            gradient.addColorStop(1, 'rgba(255, 50, 0, 0)');
+            
+            ctx.fillStyle = gradient;
+            ctx.fillRect(0, 0, 64, 64);
+            const particleTex = new THREE.CanvasTexture(canvas);
+
+            const geom = new THREE.BufferGeometry();
+            const count = isMobile ? 2500 : 8000; 
+            const pos = new Float32Array(count * 3);
+            for (let i = 0; i < count * 3; i += 3) {
+                pos[i] = (Math.random() - 0.5) * 180; 
+                pos[i + 1] = (Math.random() - 0.5) * 100; 
+                pos[i + 2] = (Math.random() - 0.5) * 35 + 2; 
+            }
+            geom.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+            
+            const mat = new THREE.PointsMaterial({
+                color: 0xffffff, size: 0.6, transparent: true, opacity: 0.95,
+                map: particleTex, blending: THREE.AdditiveBlending, depthWrite: false
+            });
+            dustParticles = new THREE.Points(geom, mat);
+            scene.add(dustParticles);
+
+            const interactiveGeom = new THREE.BufferGeometry();
+            interactiveGeom.setAttribute('position', new THREE.BufferAttribute(activeDustPositions, 3));
+            const interactiveMat = new THREE.PointsMaterial({
+                color: colorPeak, size: 1.2, transparent: true, opacity: 1.0,
+                map: particleTex, blending: THREE.AdditiveBlending, depthWrite: false
+            });
+            interactiveDust = new THREE.Points(interactiveGeom, interactiveMat);
+            scene.add(interactiveDust);
+        }
+
+        function startPreviewSequence() {
+            colorGrnd1.set('#1a0500');
+            colorGrnd2.set('#330a00');
+            colorEdge.set('#cc3300');
+            colorPeak.set('#ffaa00');
+
+            targetColorGrnd1.set('#1a0500');
+            targetColorGrnd2.set('#330a00');
+            targetColorEdge.set('#cc3300');
+            targetColorPeak.set('#ffaa00');
+
+            const baseDelayMax = 1500;
+
+            for (let i = 0; i < totalCount; i++) {
+                startScales[i] = 0;
+                let targetHeight = 0.2 + noiseValues[i] * 0.3;
+
+                if (Math.random() > 0.98) {
+                    targetHeight += 2.0 + Math.random() * 1.0;
+                }
+
+                targetScales[i] = targetHeight;
+                delays[i] = Math.random() * baseDelayMax;
+            }
+
+            if (stalkMesh && tipMesh) {
+                stalkMesh.geometry.attributes.aStartScale.needsUpdate = true;
+                stalkMesh.geometry.attributes.aTargetScale.needsUpdate = true;
+                stalkMesh.geometry.attributes.aDelay.needsUpdate = true;
+            }
+
+            transitionStartTime = performance.now();
+            animationStarted = true;
+            isPreview = true;
+        }
+
+        function startSequence() {
+            document.getElementById('introModal').style.opacity = '0';
+            setTimeout(() => document.getElementById('introModal').style.display = 'none', 1000);
+            document.getElementById('audioHud').classList.add('visible');
+            document.getElementById('topLeftControls').classList.add('visible');
+            document.getElementById('mobileMenuBtn').classList.add('visible');
+            document.getElementById('playbackControls').classList.add('visible');
+
+            initAudio();
+            if (audioCtx && audioCtx.state === 'suspended') {
+                audioCtx.resume();
+            }
+            isPreview = false;
+            startTransition(currentNumber);
+            animationStarted = true;
+        }
+
+        function setupGeometry() {
+            const stalkWidth = isMobile ? 0.08 : 0.06;
+            // MARTIAN UPDATE: Jagged silica spires instead of smooth kelp
+            const stalkGeom = new THREE.ConeGeometry(stalkWidth, 1, 3); 
+            stalkGeom.rotateX(Math.PI / 2);
+            stalkGeom.translate(0, 0, 0.5);
+
+            const tipSize = isMobile ? 0.12 : 0.08;
+            // MARTIAN UPDATE: Sharp glowing nodes
+            const tipGeom = new THREE.TetrahedronGeometry(tipSize, 0);
+
+            // BEAUTY UPDATE: High metalness and lower roughness creates a stunning, reflective crystalline glass look
+            const materialOpts = { roughness: 0.3, metalness: 0.8, vertexColors: true, transparent: true, opacity: 0.95 };
+
+            const onBeforeCompile = (shader, isTip) => {
+                shader.uniforms.uTime = shaderUniforms.uTime;
+                shader.uniforms.uNow = shaderUniforms.uNow;
+                shader.uniforms.uHeightFactor = shaderUniforms.uHeightFactor;
+                shader.uniforms.uTurbulence = shaderUniforms.uTurbulence;
+                shader.uniforms.uPlantWavePhase = shaderUniforms.uPlantWavePhase;
+                shader.uniforms.uGlobalBioActivity = shaderUniforms.uGlobalBioActivity;
+                shader.uniforms.uColorGrnd1 = shaderUniforms.uColorGrnd1;
+                shader.uniforms.uColorGrnd2 = shaderUniforms.uColorGrnd2;
+                shader.uniforms.uColorEdge = shaderUniforms.uColorEdge;
+                shader.uniforms.uColorPeak = shaderUniforms.uColorPeak;
+
+                shader.vertexShader = `
+                    #define IS_TIP ${isTip ? 1 : 0}
+
+                    uniform float uTime;
+                    uniform float uNow;
+                    uniform float uHeightFactor;
+                    uniform float uTurbulence;
+                    uniform float uPlantWavePhase;
+                    uniform float uGlobalBioActivity;
+                    uniform vec3 uColorGrnd1;
+                    uniform vec3 uColorGrnd2;
+                    uniform vec3 uColorEdge;
+                    uniform vec3 uColorPeak;
+
+                    attribute vec3 aBasePosition;
+                    attribute vec3 aBaseEuler;
+                    attribute float aStartScale;
+                    attribute float aTargetScale;
+                    attribute float aDelay;
+                    attribute float aNoise;
+                    attribute vec2 aBend;
+                    attribute float aIllumination;
+
+                    varying float vDisplayHeight;
+                    varying float vNoise;
+                    varying float vIllum;
+
+                    mat3 gpuRotation;
+                    float gpuDisplayHeight;
+
+                    mat3 rotX(float a) {
+                        float c = cos(a), s = sin(a);
+                        return mat3(1.0, 0.0, 0.0, 0.0, c, s, 0.0, -s, c);
+                    }
+                    mat3 rotY(float a) {
+                        float c = cos(a), s = sin(a);
+                        return mat3(c, 0.0, -s, 0.0, 1.0, 0.0, s, 0.0, c);
+                    }
+                    mat3 rotZ(float a) {
+                        float c = cos(a), s = sin(a);
+                        return mat3(c, s, 0.0, -s, c, 0.0, 0.0, 0.0, 1.0);
+                    }
+
+                    ${shader.vertexShader}
+                `;
+
+                shader.vertexShader = shader.vertexShader.replace(
+                    '#include <defaultnormal_vertex>',
+                    `
+                    // SPEED UPDATE: Growth animation finishes in 1000ms instead of 2000ms
+                    float progress = clamp((uTime - aDelay) / 1000.0, 0.0, 1.0);
+                    float easeFactor = 1.0 - pow(1.0 - progress, 3.0);
+                    gpuDisplayHeight = (aStartScale + (aTargetScale - aStartScale) * easeFactor) * uHeightFactor;
+
+                    // LEGIBILITY UPDATE: Keep the actual numbers rigid while the background stays chaotic
+                    float numberWeight = smoothstep(0.5, 3.5, gpuDisplayHeight);
+                    float dampener = 1.0 - (numberWeight * 0.9); // 90% less movement on the tall numbers
+
+                    // SOLAR WIND SWAY
+                    float swayX = sin(uNow * 0.002 + aBasePosition.x * 0.1 + aBasePosition.y * 0.8) * 0.2 * gpuDisplayHeight * uTurbulence * dampener;
+                    float swayY = cos(uNow * 0.0025 + aBasePosition.y * 0.1 + aBasePosition.x * 0.8) * 0.2 * gpuDisplayHeight * uTurbulence * dampener;
+
+                    // Extra node twist
+                    float wind = sin(uNow * 0.002 + aBasePosition.x * 0.1 + aBasePosition.y * 0.8) * 0.2;
+                    float activeWind = wind * dampener; 
+                    mat3 localSwaySpin = rotZ(activeWind) * rotY(activeWind * 0.5);
+
+                    float wriggleX = 0.0;
+                    float wriggleY = 0.0;
+                    if (aTargetScale > aStartScale && aTargetScale * uHeightFactor > 3.0) {
+                        // SPEED UPDATE: Sync the wriggle fade out with the new 1000ms speed
+                        float p = clamp((uTime - aDelay) / 1000.0, 0.0, 1.0);
+                        float wriggleAmt = sin(p * 3.14159) * 0.25;
+                        wriggleX = sin(uNow * 0.006 + aBasePosition.x) * wriggleAmt * dampener;
+                        wriggleY = cos(uNow * 0.005 + aBasePosition.y) * wriggleAmt * dampener;
+                    }
+
+                    vec3 euler = aBaseEuler + vec3(aBend.x + swayX + wriggleX, aBend.y + swayY + wriggleY, 0.0);
+                    
+                    gpuRotation = rotZ(euler.z) * rotY(euler.y) * rotX(euler.x) * localSwaySpin;
+
+                    vec3 transformedNormal = normalMatrix * (gpuRotation * objectNormal);
+                    #ifdef FLIP_SIDED
+                        transformedNormal = - transformedNormal;
+                    #endif
+                    #ifdef USE_TANGENT
+                        vec3 transformedTangent = normalMatrix * (gpuRotation * objectTangent);
+                        #ifdef FLIP_SIDED
+                            transformedTangent = - transformedTangent;
+                        #endif
+                    #endif
+                    `
+                );
+
+                shader.vertexShader = shader.vertexShader.replace(
+                    '#include <begin_vertex>',
+                    `
+                    vec3 transformed = vec3( position );
+
+                    vDisplayHeight = gpuDisplayHeight;
+                    vNoise = aNoise;
+                    vIllum = aIllumination;
+
+                    #if IS_TIP == 1
+                        float tipScale = min(1.0, gpuDisplayHeight * 3.0);
+                        transformed *= tipScale;
+                        transformed += vec3(0.0, 0.0, gpuDisplayHeight);
+                    #else
+                        float scaleXY = mix(0.5, 4.0, numberWeight); 
+                        transformed *= vec3(scaleXY, scaleXY, max(0.05, gpuDisplayHeight));
+                    #endif
+
+                    transformed = gpuRotation * transformed;
+                    transformed += aBasePosition;
+
+                    vec3 baseColor = mix(uColorGrnd1, uColorGrnd2, vNoise);
+                    vec3 finalColor = baseColor;
+
+                    float h = gpuDisplayHeight;
+                    if (h < 0.6) {
+                        finalColor = baseColor * 0.25; // Dark abyssal floor
+                    } else if (h < 2.5) {
+                        float t = (h - 0.6) / 1.9;
+                        finalColor = mix(baseColor, uColorEdge, t);
+                    } else {
+                        float t = min(1.0, (h - 2.5) / 1.5);
+                        finalColor = mix(uColorEdge, uColorPeak, t);
+                        finalColor += vec3(t * 1.5); // Radiant glowing peaks
+                    }
+
+                    vec3 tipColorBase;
+                    if (h < 1.5) {
+                        tipColorBase = min(vec3(1.0), finalColor * 1.5 + vec3(0.2));
+                    } else {
+                        tipColorBase = min(vec3(1.0), finalColor * 1.8);
+                    }
+
+                    #if IS_TIP == 1
+                        finalColor = tipColorBase;
+                    #endif
+
+                    if (vIllum > 0.0) {
+                        float illum = vIllum;
+                        #if IS_TIP == 0
+                            finalColor = mix(finalColor, uColorPeak, illum * 0.8);
+                        #else
+                            finalColor = mix(finalColor, vec3(1.0), illum);
+                        #endif
+                    }
+
+                    vColor = finalColor;
+                    `
+                );
+            };
+
+            const stalkMat = new THREE.MeshStandardMaterial(materialOpts);
+            stalkMat.onBeforeCompile = (shader) => onBeforeCompile(shader, false);
+
+            const tipMat = new THREE.MeshStandardMaterial(materialOpts);
+            tipMat.onBeforeCompile = (shader) => onBeforeCompile(shader, true);
+
+            stalkMesh = new THREE.InstancedMesh(stalkGeom, stalkMat, totalCount);
+            tipMesh = new THREE.InstancedMesh(tipGeom, tipMat, totalCount);
+
+            stalkMesh.castShadow = true; stalkMesh.receiveShadow = true;
+            tipMesh.castShadow = true; tipMesh.receiveShadow = true;
+
+            stalkMesh.frustumCulled = false;
+            tipMesh.frustumCulled = false;
+
+            const stalkMatArr = stalkMesh.instanceMatrix.array;
+            const tipMatArr = tipMesh.instanceMatrix.array;
+            for (let i = 0; i < totalCount; i++) {
+                const o = i * 16;
+                stalkMatArr[o] = 1; stalkMatArr[o + 5] = 1; stalkMatArr[o + 10] = 1; stalkMatArr[o + 15] = 1;
+                tipMatArr[o] = 1; tipMatArr[o + 5] = 1; tipMatArr[o + 10] = 1; tipMatArr[o + 15] = 1;
+            }
+            stalkMesh.instanceMatrix.needsUpdate = true;
+            tipMesh.instanceMatrix.needsUpdate = true;
+
+            let idx = 0;
+
+            for (let r = 0; r < gridRows; r++) {
+                for (let c = 0; c < gridCols; c++) {
+                    const worldX = (c / gridCols - 0.5) * groundWidth;
+                    const worldY = -(r / gridRows - 0.5) * groundHeight;
+                    const noise = Math.sin(worldX * 0.4) + Math.cos(worldY * 0.4) + Math.sin((worldX + worldY) * 0.25) + Math.random() * 0.6;
+
+                    for (let s = 0; s < stalksPerCell; s++) {
+                        if (idx >= totalCount) break;
+
+                        positions[idx * 3] = worldX + (Math.random() - 0.5) * 0.1;
+                        positions[idx * 3 + 1] = worldY + (Math.random() - 0.5) * 0.1;
+                        positions[idx * 3 + 2] = (Math.random() - 0.5) * 0.4;
+
+                        const angle = Math.random() * Math.PI * 2;
+                        const tilt = Math.random() * 0.45; // slightly less tilted for oceanic sway
+
+                        baseEulers[idx * 3] = Math.sin(angle) * tilt;
+                        baseEulers[idx * 3 + 1] = Math.cos(angle) * tilt;
+                        baseEulers[idx * 3 + 2] = Math.random() * Math.PI;
+
+                        startScales[idx] = 0;
+                        targetScales[idx] = 0;
+                        noiseValues[idx] = Math.max(0, Math.min(1, noise * 0.5 + 0.25));
+
+                        idx++;
+                    }
+                }
+            }
+
+            const positionAttr = new THREE.InstancedBufferAttribute(positions, 3);
+            const eulerAttr = new THREE.InstancedBufferAttribute(baseEulers, 3);
+            const startScaleAttr = new THREE.InstancedBufferAttribute(startScales, 1);
+            const targetScaleAttr = new THREE.InstancedBufferAttribute(targetScales, 1);
+            const delayAttr = new THREE.InstancedBufferAttribute(delays, 1);
+            const noiseAttr = new THREE.InstancedBufferAttribute(noiseValues, 1);
+            const bendAttr = new THREE.InstancedBufferAttribute(bends, 2);
+            const illumAttr = new THREE.InstancedBufferAttribute(illumination, 1);
+
+            stalkMesh.geometry.setAttribute('aBasePosition', positionAttr);
+            stalkMesh.geometry.setAttribute('aBaseEuler', eulerAttr);
+            stalkMesh.geometry.setAttribute('aStartScale', startScaleAttr);
+            stalkMesh.geometry.setAttribute('aTargetScale', targetScaleAttr);
+            stalkMesh.geometry.setAttribute('aDelay', delayAttr);
+            stalkMesh.geometry.setAttribute('aNoise', noiseAttr);
+            stalkMesh.geometry.setAttribute('aBend', bendAttr);
+            stalkMesh.geometry.setAttribute('aIllumination', illumAttr);
+
+            tipMesh.geometry.setAttribute('aBasePosition', positionAttr);
+            tipMesh.geometry.setAttribute('aBaseEuler', eulerAttr);
+            tipMesh.geometry.setAttribute('aStartScale', startScaleAttr);
+            tipMesh.geometry.setAttribute('aTargetScale', targetScaleAttr);
+            tipMesh.geometry.setAttribute('aDelay', delayAttr);
+            tipMesh.geometry.setAttribute('aNoise', noiseAttr);
+            tipMesh.geometry.setAttribute('aBend', bendAttr);
+            tipMesh.geometry.setAttribute('aIllumination', illumAttr);
+
+            scene.add(stalkMesh);
+            scene.add(tipMesh);
+        }
+
+        function restartAnimation() {
+            currentNumber = 10;
+            camera.position.set(0, 0, getInitialZ());
+            isCountdownPaused = false;
+            isSequenceComplete = false;
+            isPreview = false;
+            document.getElementById('mainPauseBtn').innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/></svg> PAUSE`;
+
+            document.getElementById('fadeOverlay').classList.remove('active');
+            document.getElementById('audioHud').classList.add('visible');
+            document.getElementById('topLeftControls').classList.add('visible');
+            document.getElementById('mobileMenuBtn').classList.add('visible');
+            document.getElementById('playbackControls').classList.add('visible');
+
+            if (masterGain && audioCtx) {
+                masterGain.gain.cancelScheduledValues(audioCtx.currentTime);
+                masterGain.gain.setValueAtTime(0, audioCtx.currentTime);
+                masterGain.gain.linearRampToValueAtTime(isMuted ? 0 : 0.6, audioCtx.currentTime + 2.0);
+            }
+
+            for (let i = 0; i < totalCount; i++) {
+                startScales[i] = 0;
+                targetScales[i] = 0;
+                bends[i * 2] = 0;
+                bends[i * 2 + 1] = 0;
+                illumination[i] = 0;
+            }
+
+            if (stalkMesh && tipMesh) {
+                stalkMesh.geometry.attributes.aStartScale.needsUpdate = true;
+                stalkMesh.geometry.attributes.aTargetScale.needsUpdate = true;
+                stalkMesh.geometry.attributes.aBend.needsUpdate = true;
+                stalkMesh.geometry.attributes.aIllumination.needsUpdate = true;
+            }
+
+            startTransition(currentNumber);
+        }
+
+        function startTransition(num) {
+            ctx.fillStyle = 'black';
+            ctx.fillRect(0, 0, canvasSize, canvasSize);
+
+            const fontSize = num === 10 ? 300 : 400; 
+            ctx.filter = 'blur(16px)';
+            ctx.fillStyle = '#0000ff';
+            ctx.font = `900 ${fontSize}px 'Arial Black', Impact, sans-serif`;
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+
+            ctx.fillText(num.toString(), canvasSize / 2, canvasSize / 2 + 20);
+            ctx.fillText(num.toString(), canvasSize / 2, canvasSize / 2 + 20);
+
+            ctx.filter = 'none';
+            ctx.fillStyle = '#ff0000';
+            ctx.fillText(num.toString(), canvasSize / 2, canvasSize / 2 + 20);
+
+            const imgData = ctx.getImageData(0, 0, canvasSize, canvasSize).data;
+
+            currentAudioProfile = audioProfiles[num];
+            if (droneOsc) droneOsc.type = currentAudioProfile.drone;
+
+            if (currentAudioProfile.colors) {
+                targetColorGrnd1.set(currentAudioProfile.colors.g1);
+                targetColorGrnd2.set(currentAudioProfile.colors.g2);
+                targetColorEdge.set(currentAudioProfile.colors.edge);
+                targetColorPeak.set(currentAudioProfile.colors.peak);
+
+                document.getElementById('colGrnd1').value = currentAudioProfile.colors.g1;
+                document.getElementById('colGrnd2').value = currentAudioProfile.colors.g2;
+                document.getElementById('colEdge').value = currentAudioProfile.colors.edge;
+                document.getElementById('colPeak').value = currentAudioProfile.colors.peak;
+                
+                // Update UI text color dynamically based on element
+                uiTitles.forEach(el => {
+                    if (el) el.style.color = currentAudioProfile.colors.peak;
+                });
+                
+                // Update audio delay time dynamically based on the 4 elements
+                if (masterDelay) {
+                    masterDelay.delayTime.setTargetAtTime(0.75, audioCtx.currentTime, 0.5); 
+                }
+            }
+
+            if (hudGenEl) hudGenEl.innerText = num;
+            if (hudScaleEl) hudScaleEl.innerText = currentAudioProfile.name;
+            if (hudFreqEl) hudFreqEl.innerText = `${currentAudioProfile.scale[0].toFixed(1)} Hz`;
+            if (hudWaveEl) hudWaveEl.innerText = `${currentAudioProfile.drone} / ${currentAudioProfile.pluck}`;
+
+            let idx = 0;
+
+            const aspect = window.innerWidth / window.innerHeight;
+            let textRegionSize = 65; 
+            if (aspect < 0.6) textRegionSize = 25; 
+            else if (aspect < 0.9) textRegionSize = 40; 
+
+            const prevElapsed = performance.now() - transitionStartTime;
+
+            for (let r = 0; r < gridRows; r++) {
+                for (let c = 0; c < gridCols; c++) {
+                    const worldX = (c / gridCols - 0.5) * groundWidth;
+                    const worldY = -(r / gridRows - 0.5) * groundHeight;
+
+                    const canvasX = ((worldX / textRegionSize) + 0.5) * canvasSize;
+                    const canvasY = ((-worldY / textRegionSize) + 0.5) * canvasSize;
+
+                    let isVein = false;
+                    let haloIntensity = 0;
+
+                    if (canvasX >= 0 && canvasX < canvasSize && canvasY >= 0 && canvasY < canvasSize) {
+                        const pixelIndex = (Math.floor(canvasY) * canvasSize + Math.floor(canvasX)) * 4;
+                        const rVal = imgData[pixelIndex];
+                        const bVal = imgData[pixelIndex + 2];
+
+                        isVein = rVal > 100;
+                        haloIntensity = bVal / 255;
+                    }
+
+                    const dx = worldX;
+                    const dy = worldY;
+                    const distFromCenter = Math.sqrt(dx * dx + dy * dy);
+                    
+                    // SPEED UPDATE: The ripple sweeps across the grid much faster
+                    const baseDelay = distFromCenter * 1.5;
+
+                    for (let s = 0; s < stalksPerCell; s++) {
+                        if (idx >= totalCount) break;
+
+                        // SPEED UPDATE: Match the 1000ms shader easing in the javascript logic
+                        const progress = Math.min(1, Math.max(0, (prevElapsed - delays[idx]) / 1000));
+                        const easeFactor = 1 - Math.pow(1 - progress, 3);
+                        const currentHeight = startScales[idx] + (targetScales[idx] - startScales[idx]) * easeFactor;
+                        startScales[idx] = currentHeight;
+
+                        let targetHeight = 0;
+
+                        if (isVein) {
+                            // Boosted the numbers slightly higher to ensure intense core coloration
+                            targetHeight = 5.0 + (Math.random() * 0.2); 
+                        } else if (haloIntensity > 0.02) {
+                            const t = Math.pow(haloIntensity, 0.4);
+                            targetHeight = 0.5 + t * 1.5 + Math.random() * 0.2;
+                        } else {
+                            targetHeight = 0.05 + Math.random() * 0.08;
+                            if (currentHeight > 1.0) {
+                                targetHeight = 0.12; 
+                            }
+                        }
+
+                        targetScales[idx] = targetHeight;
+                        delays[idx] = baseDelay + Math.random() * 500;
+                        idx++;
+                    }
+                }
+            }
+
+            if (stalkMesh && tipMesh) {
+                stalkMesh.geometry.attributes.aStartScale.needsUpdate = true;
+                stalkMesh.geometry.attributes.aTargetScale.needsUpdate = true;
+                stalkMesh.geometry.attributes.aDelay.needsUpdate = true;
+            }
+
+            transitionStartTime = performance.now();
+        }
+
+        function onWindowResize() {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        }
+
+        const colorDistSq = (c1, c2) => {
+            const dr = c1.r - c2.r;
+            const dg = c1.g - c2.g;
+            const db = c1.b - c2.b;
+            return dr * dr + dg * dg + db * db;
+        };
+
+        function animate() {
+            requestAnimationFrame(animate);
+
+            const now = performance.now();
+            const delta = now - lastFrameTime;
+            lastFrameTime = now;
+
+            if (animationStarted) {
+                const elapsed = now - transitionStartTime;
+
+                currentTurbulence += (targetTurbulence - currentTurbulence) * 0.05;
+
+                let colorFading = false;
+                const lerpSpeed = 0.015; 
+
+                if (colorDistSq(colorGrnd1, targetColorGrnd1) > 0.0001) { colorGrnd1.lerp(targetColorGrnd1, lerpSpeed); colorFading = true; }
+                if (colorDistSq(colorGrnd2, targetColorGrnd2) > 0.0001) { colorGrnd2.lerp(targetColorGrnd2, lerpSpeed); colorFading = true; }
+                if (colorDistSq(colorEdge, targetColorEdge) > 0.0001) { colorEdge.lerp(targetColorEdge, lerpSpeed); colorFading = true; }
+                if (colorDistSq(colorPeak, targetColorPeak) > 0.0001) { colorPeak.lerp(targetColorPeak, lerpSpeed); colorFading = true; }
+
+                if (colorFading) {
+                    if (mouseLight) mouseLight.color.copy(colorPeak);
+                    if (interactiveDust) interactiveDust.material.color.copy(colorPeak);
+                    if (document.getElementById('aiLogTerminal')) {
+                        document.getElementById('aiLogTerminal').style.borderColor = `rgb(${colorPeak.r*255}, ${colorPeak.g*255}, ${colorPeak.b*255})`;
+                    }
+                }
+
+                const speedMultiplier = 1.0 + (currentTurbulence - 1.0) * 0.8;
+                plantWavePhase += delta * 0.0004 * speedMultiplier;
+                const globalBioActivity = (Math.sin(plantWavePhase) * 0.5 + 0.5); 
+
+                shaderUniforms.uNow.value = now;
+                shaderUniforms.uHeightFactor.value = heightFactor;
+                shaderUniforms.uTurbulence.value = currentTurbulence;
+                shaderUniforms.uPlantWavePhase.value = plantWavePhase;
+                shaderUniforms.uGlobalBioActivity.value = globalBioActivity;
+                shaderUniforms.uColorGrnd1.value.copy(colorGrnd1);
+                shaderUniforms.uColorGrnd2.value.copy(colorGrnd2);
+                shaderUniforms.uColorEdge.value.copy(colorEdge);
+                shaderUniforms.uColorPeak.value.copy(colorPeak);
+
+                let totalForce = 0;
+                let weightedAvgX = 0;
+                let weightedAvgY = 0;
+                let totalWeight = 0;
+
+                if (userTargetZ === null) {
+                    const currentTargetZ = getTargetZ();
+                    if (camera.position.z > currentTargetZ) {
+                        camera.position.z -= 0.005;
+                    } else if (camera.position.z < currentTargetZ - 1) {
+                        camera.position.z += 0.05; 
+                    }
+                }
+
+                const targetCamX = (mouse.x === -1000 ? 0 : mouse.x) * 4;
+                const targetCamY = (mouse.y === -1000 ? 0 : mouse.y) * 4;
+                camera.position.x += (targetCamX - camera.position.x) * 0.02;
+                camera.position.y += (targetCamY - camera.position.y) * 0.02;
+                camera.lookAt(0, 0, 0);
+
+                const mouseSpeed = mouseWorld.distanceTo(lastMouseWorld);
+
+                // BEAUTY UPDATE: Stronger, more dramatic cinematic sweeping of the entire scene
+                scene.rotation.x = Math.sin(now * 0.00015) * 0.12;
+                scene.rotation.y = Math.cos(now * 0.0001) * 0.12;
+
+                if (mouseLight) {
+                    mouseLight.position.x += (mouseWorld.x - mouseLight.position.x) * 0.15;
+                    mouseLight.position.y += (mouseWorld.y - mouseLight.position.y) * 0.15;
+                    mouseLight.position.z = 15; 
+
+                    const targetIntensity = 3.5 + (Math.min(1.0, totalForce / 400.0) * 8.0);
+                    mouseLight.intensity += (targetIntensity - mouseLight.intensity) * 0.1;
+                }
+                
+                // SOLAR SPARK PHYSICS: Golden sparks float upward into the dark sky
+                if (dustParticles) {
+                    dustParticles.rotation.y += 0.0005;
+                    dustParticles.rotation.x += 0.0002;
+
+                    const targetParallaxX = mouse.x === -1000 ? 0 : mouse.x * -3;
+                    const targetParallaxY = mouse.y === -1000 ? 0 : mouse.y * -3;
+                    dustParticles.position.x += (targetParallaxX - dustParticles.position.x) * 0.02;
+                    dustParticles.position.y += (targetParallaxY - dustParticles.position.y) * 0.02;
+
+                    const pos = dustParticles.geometry.attributes.position.array;
+                    for (let i = 0; i < pos.length; i += 3) {
+                        pos[i] += (Math.random() - 0.5) * 0.12;
+                        pos[i+1] += (Math.random() - 0.5) * 0.12;
+                        pos[i+2] += 0.08 + Math.random() * 0.1;
+                        if (pos[i+2] > 40) pos[i+2] = -10;
+                    }
+                    dustParticles.geometry.attributes.position.needsUpdate = true;
+                }
+
+                let currentActiveDust = 0;
+                let avgDustSpeed = 0;
+                if (interactiveDust) {
+                    const pos = interactiveDust.geometry.attributes.position.array;
+                    let needsDustUpdate = false;
+                    for (let i = 0; i < maxInteractiveDust; i++) {
+                        if (activeDustLifetimes[i] > 0) {
+                            pos[i * 3] += activeDustVelocities[i * 3];
+                            pos[i * 3 + 1] += activeDustVelocities[i * 3 + 1];
+                            pos[i * 3 + 2] += activeDustVelocities[i * 3 + 2];
+                            activeDustLifetimes[i] -= delta * 0.001;
+
+                            currentActiveDust++;
+                            avgDustSpeed += Math.abs(activeDustVelocities[i * 3]) + Math.abs(activeDustVelocities[i * 3 + 1]) + Math.abs(activeDustVelocities[i * 3 + 2]);
+
+                            activeDustVelocities[i * 3] *= 0.95;
+                            activeDustVelocities[i * 3 + 1] *= 0.95;
+                            activeDustVelocities[i * 3 + 2] *= 0.98; 
+
+                            if (activeDustLifetimes[i] <= 0) {
+                                pos[i * 3] = 9999; 
+                            }
+                            needsDustUpdate = true;
+                        }
+                    }
+                    if (currentActiveDust > 0) avgDustSpeed /= currentActiveDust;
+                    if (needsDustUpdate) interactiveDust.geometry.attributes.position.needsUpdate = true;
+                }
+
+                const interactionRadius = 8.5;
+                const interactionRadSq = interactionRadius * interactionRadius;
+
+                let needsBendUpdate = false;
+                let needsIllumUpdate = false;
+
+                if (hasActiveBends || hasActiveIllum) {
+                    let anyBendActive = false;
+                    let anyIllumActive = false;
+                    for (let i = 0; i < totalCount; i++) {
+                        if (hasActiveBends) {
+                            const bx = bends[i * 2];
+                            const by = bends[i * 2 + 1];
+                            if (bx !== 0 || by !== 0) {
+                                bends[i * 2] = Math.abs(bx) < 0.001 ? 0 : bx * 0.85;
+                                bends[i * 2 + 1] = Math.abs(by) < 0.001 ? 0 : by * 0.85;
+                                needsBendUpdate = true;
+                                anyBendActive = true;
+                            }
+                        }
+                        if (hasActiveIllum) {
+                            if (illumination[i] > 0) {
+                                illumination[i] -= 0.015;
+                                if (illumination[i] <= 0) illumination[i] = 0;
+                                needsIllumUpdate = true;
+                                anyIllumActive = true;
+                            }
+                        }
+                    }
+                    hasActiveBends = anyBendActive;
+                    hasActiveIllum = anyIllumActive;
+                }
+
+                const cellWidth = groundWidth / gridCols;
+                const cellHeight = groundHeight / gridRows;
+                const mouseCellC = (mouseWorld.x / groundWidth + 0.5) * gridCols;
+                const mouseCellR = (-mouseWorld.y / groundHeight + 0.5) * gridRows;
+
+                const cellRadiusC = Math.ceil(interactionRadius / cellWidth) + 1;
+                const cellRadiusR = Math.ceil(interactionRadius / cellHeight) + 1;
+
+                const minR = Math.max(0, Math.floor(mouseCellR - cellRadiusR));
+                const maxR = Math.min(gridRows - 1, Math.ceil(mouseCellR + cellRadiusR));
+                const minC = Math.max(0, Math.floor(mouseCellC - cellRadiusC));
+                const maxC = Math.min(gridCols - 1, Math.ceil(mouseCellC + cellRadiusC));
+
+                for (let r = minR; r <= maxR; r++) {
+                    for (let c = minC; c <= maxC; c++) {
+                        const cellBaseIdx = (r * gridCols + c) * stalksPerCell;
+                        for (let s = 0; s < stalksPerCell; s++) {
+                            const i = cellBaseIdx + s;
+                            if (i >= totalCount) break;
+
+                            const px = positions[i * 3];
+                            const py = positions[i * 3 + 1];
+
+                            const dx = px - mouseWorld.x;
+                            const dy = py - mouseWorld.y;
+                            const distSq = dx * dx + dy * dy;
+                            if (distSq >= interactionRadSq) continue;
+
+                            const dist = Math.sqrt(distSq);
+                            const force = Math.pow((interactionRadius - dist) / interactionRadius, 2);
+                            const targetBendX = (dy / dist) * force * 1.2;
+                            const targetBendY = -(dx / dist) * force * 1.2;
+
+                            bends[i * 2] += targetBendX * 0.15;
+                            bends[i * 2 + 1] += targetBendY * 0.15;
+                            needsBendUpdate = true;
+                            hasActiveBends = true;
+
+                            const progress = Math.min(1, Math.max(0, (elapsed - delays[i]) / 2000));
+                            const easeFactor = 1 - Math.pow(1 - progress, 3);
+                            const displayHeight = (startScales[i] + (targetScales[i] - startScales[i]) * easeFactor) * heightFactor;
+
+                            if (displayHeight > 0.1) {
+                                const heightWeight = Math.pow(displayHeight, 2.5);
+                                const weightedForce = force * heightWeight;
+
+                                totalForce += weightedForce;
+                                weightedAvgX += px * weightedForce;
+                                weightedAvgY += py * weightedForce;
+                                totalWeight += weightedForce;
+
+                                if (displayHeight > 0.5) {
+                                    illumination[i] = Math.min(1.0, illumination[i] + force * 1.5);
+                                    needsIllumUpdate = true;
+                                    hasActiveIllum = true;
+                                }
+                            }
+                        }
+                    }
+                }
+
+                if (needsBendUpdate && stalkMesh) stalkMesh.geometry.attributes.aBend.needsUpdate = true;
+                if (needsIllumUpdate && stalkMesh) stalkMesh.geometry.attributes.aIllumination.needsUpdate = true;
+
+                if (elapsed > DURATION_PER_NUMBER && !isCountdownPaused && !isPreview) {
+                    if (currentNumber > 1) {
+                        currentNumber--;
+                        startTransition(currentNumber);
+                    } else if (currentNumber === 1 && !isSequenceComplete) {
+                        triggerEndSequence();
+                    }
+                }
+
+                shaderUniforms.uTime.value = now - transitionStartTime;
+
+                if (audioEnabled) {
+                    if (hudBioEl) hudBioEl.style.width = `${globalBioActivity * 100}%`;
+
+                    const normalizedTotalForce = Math.min(1.0, totalForce / 350.0);
+                    lastKnownResonance = normalizedTotalForce; 
+
+                    if (hudResEl) {
+                        hudResEl.style.width = `${Math.min(100, normalizedTotalForce * 100)}%`;
+                        hudSpeedEl.innerText = `${Math.min(100, Math.floor(mouseSpeed * 200))}%`;
+                        hudCutoffEl.innerText = `${Math.floor(300 + normalizedTotalForce * 5000)} Hz`;
+                        hudPanEl.style.left = `${(((mouse.x === -1000 ? 0 : mouse.x) + 1) / 2) * 100}%`;
+                        hudVoicesEl.innerText = activePlucks;
+                        hudDustEl.innerText = currentActiveDust;
+                    }
+
+                    const combinedForce = Math.min(1.0, normalizedTotalForce + (globalBioActivity * 0.2 * Math.max(1, currentTurbulence)));
+                    const targetDroneGain = isMobile ? 0 : (combinedForce * 0.3); 
+                    droneGain.gain.setTargetAtTime(targetDroneGain, audioCtx.currentTime, 0.15);
+
+                    if (currentAudioProfile) {
+                        const scale = currentAudioProfile.scale;
+
+                        if (!isMobile) {
+                            const rootFreq = scale[0] / 2;
+                            droneOsc.frequency.setTargetAtTime(rootFreq, audioCtx.currentTime, 0.5);
+                            if (droneOsc2) droneOsc2.frequency.setTargetAtTime(rootFreq, audioCtx.currentTime, 0.5);
+
+                            droneFilter.frequency.setTargetAtTime(200 + combinedForce * 6000, audioCtx.currentTime, 0.15);
+                        }
+
+                        const autoNoteChance = Math.pow(globalBioActivity, 3) * 0.08 * (0.2 + currentTurbulence * 0.8);
+
+                        if (Math.random() < autoNoteChance && activePlucks < 25) {
+                            let noteIdxOffset = Math.floor(globalBioActivity * scale.length * 0.4);
+                            let noteIndex = Math.min(scale.length - 1, noteIdxOffset + Math.floor(Math.random() * (scale.length * 0.6)));
+
+                            const freq = scale[noteIndex];
+                            const brightness = 300 + globalBioActivity * 1500 + Math.random() * 500;
+                            const pan = (Math.random() * 2) - 1;
+                            const duration = 2.5 + Math.random() * 2.5; 
+
+                            playPluck(freq, brightness, currentAudioProfile.pluck, pan, duration);
+
+                            if (interactiveDust) {
+                                let dIdx = activeDustIndex % maxInteractiveDust;
+                                activeDustPositions[dIdx * 3] = pan * 25 + (Math.random() - 0.5) * 10;
+                                activeDustPositions[dIdx * 3 + 1] = (Math.random() - 0.5) * 20;
+                                activeDustPositions[dIdx * 3 + 2] = 8 + Math.random() * 5;
+
+                                activeDustVelocities[dIdx * 3] = (Math.random() - 0.5) * 0.1;
+                                activeDustVelocities[dIdx * 3 + 1] = (Math.random() - 0.5) * 0.1;
+                                activeDustVelocities[dIdx * 3 + 2] = Math.random() * 0.1 + 0.1;
+
+                                activeDustLifetimes[dIdx] = 1.0 + Math.random() * 1.5;
+                                activeDustIndex++;
+                                interactiveDust.geometry.attributes.position.needsUpdate = true;
+                            }
+                        }
+
+                        if (totalWeight > 0) {
+                            const avgX = weightedAvgX / totalWeight;
+                            const avgY = weightedAvgY / totalWeight;
+
+                            const xNorm = Math.max(0, Math.min(1, (avgX + 25) / 50));
+                            const noteIndex = Math.floor(xNorm * (scale.length - 1));
+
+                            let brushIntensity = Math.min(mouseSpeed * normalizedTotalForce * 150, isMobile ? 3 : 5);
+
+                            if (brushIntensity > 0.05) {
+                                let hits = Math.floor(brushIntensity * 0.1); 
+                                if (Math.random() < (brushIntensity % 1)) hits++;
+                                hits = Math.min(hits, isMobile ? 1 : 2); 
+
+                                for (let h = 0; h < hits; h++) {
+                                    const pluckIndex = Math.max(0, Math.min(currentAudioProfile.scale.length - 1, noteIndex + Math.floor((Math.random() - 0.5) * 3)));
+
+                                    const brightness = 400 + (Math.max(0, avgY + 25) / 50) * 1500 + (Math.random() * 1000) + (mouseSpeed * 3000);
+                                    const panValue = (xNorm * 2) - 1;
+
+                                    const cappedSpeed = Math.min(mouseSpeed, 0.5);
+                                    const duration = Math.max(1.5, 3.5 - (cappedSpeed * 2.0));
+
+                                    playPluck(currentAudioProfile.scale[pluckIndex], brightness, currentAudioProfile.pluck, panValue, duration);
+                                }
+
+                                let dustToSpawn = Math.min(60, Math.floor(brushIntensity * 2.5));
+                                if (dustToSpawn > 0) {
+                                    for (let d = 0; d < dustToSpawn; d++) {
+                                        let idx = activeDustIndex % maxInteractiveDust;
+                                        activeDustPositions[idx * 3] = (avgX) + (Math.random() - 0.5) * 4.0;
+                                        activeDustPositions[idx * 3 + 1] = (avgY) + (Math.random() - 0.5) * 4.0;
+                                        activeDustPositions[idx * 3 + 2] = 5 + Math.random() * 4;
+
+                                        activeDustVelocities[idx * 3] = (mouseWorld.x - lastMouseWorld.x) * 1.5 + (Math.random() - 0.5) * 2.5;
+                                        activeDustVelocities[idx * 3 + 1] = (mouseWorld.y - lastMouseWorld.y) * 1.5 + (Math.random() - 0.5) * 2.5;
+                                        activeDustVelocities[idx * 3 + 2] = Math.random() * 0.8 + 0.4;
+
+                                        activeDustLifetimes[idx] = 1.0 + Math.random() * 1.2;
+                                        activeDustIndex++;
+                                    }
+                                    interactiveDust.geometry.attributes.position.needsUpdate = true;
+                                }
+
+                                const panValue = (xNorm * 2) - 1;
+                                if (Math.random() < 0.5) playDustSound(brushIntensity * 0.5, mouseSpeed, panValue); 
+                            }
+                        } else if (!isMobile) {
+                            droneGain.gain.setTargetAtTime(0, audioCtx.currentTime, 0.4);
+                        }
+
+                        if (currentActiveDust > 0) {
+                            let dustSoundChance = (currentActiveDust / maxInteractiveDust) * 0.9 + (avgDustSpeed * 0.5);
+                            if (Math.random() < dustSoundChance) {
+                                const panValue = (Math.random() * 2) - 1;
+                                playDustSound(currentActiveDust * 0.05, avgDustSpeed * 1.5, panValue);
+                            }
+                        }
+                    } 
+                } 
+
+                lastMouseWorld.copy(mouseWorld);
+            } 
+
+            renderer.render(scene, camera);
+        }
+
+        function triggerEndSequence() {
+            isSequenceComplete = true;
+
+            if (masterGain && audioCtx) {
+                masterGain.gain.cancelScheduledValues(audioCtx.currentTime);
+                masterGain.gain.setValueAtTime(masterGain.gain.value, audioCtx.currentTime);
+                masterGain.gain.linearRampToValueAtTime(0, audioCtx.currentTime + 5.0);
+            }
+
+            document.getElementById('fadeOverlay').classList.add('active');
+            document.getElementById('audioHud').classList.remove('visible');
+            document.getElementById('topLeftControls').classList.remove('visible');
+            document.getElementById('mobileMenuBtn').classList.remove('visible');
+            document.getElementById('playbackControls').classList.remove('visible');
+            document.body.classList.remove('menu-open');
+        }
+
+        function initAudio() {
+            if (audioCtx) {
+                if (audioCtx.state === 'suspended') audioCtx.resume();
+                return;
+            }
+            audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+            if (audioCtx.state === 'suspended') audioCtx.resume();
+
+            const compressor = audioCtx.createDynamicsCompressor();
+            compressor.threshold.value = -12; 
+            compressor.knee.value = 12;
+            compressor.ratio.value = 12; 
+            compressor.attack.value = 0.005; 
+            compressor.release.value = 0.25;
+            compressor.connect(audioCtx.destination);
+
+            const masterHighpass = audioCtx.createBiquadFilter();
+            masterHighpass.type = 'highpass';
+            masterHighpass.frequency.value = isMobile ? 120 : 80; 
+            masterHighpass.Q.value = 0.7; 
+            masterHighpass.connect(compressor);
+
+            masterGain = audioCtx.createGain();
+            masterGain.gain.value = isMobile ? 0.4 : 0.5; 
+            masterGain.connect(masterHighpass); 
+
+            masterDelay = audioCtx.createDelay();
+            masterDelay.delayTime.value = 0.75; 
+            delayFeedback = audioCtx.createGain();
+            delayFeedback.gain.value = 0.75; 
+            const delayFilter = audioCtx.createBiquadFilter();
+            delayFilter.type = 'lowpass';
+            delayFilter.frequency.value = 800; 
+
+            masterDelay.connect(delayFeedback);
+            delayFeedback.connect(delayFilter);
+            delayFilter.connect(masterDelay);
+            masterDelay.connect(masterGain);
+
+            droneOsc = audioCtx.createOscillator();
+            droneOsc.type = 'sawtooth';
+            const oscGain1 = audioCtx.createGain(); oscGain1.gain.value = 0.2;
+
+            droneOsc2 = audioCtx.createOscillator();
+            droneOsc2.type = 'sawtooth'; 
+            droneOsc2.detune.value = 15; 
+            const oscGain2 = audioCtx.createGain(); oscGain2.gain.value = 0.15;
+
+            droneGain = audioCtx.createGain();
+            droneGain.gain.value = 0;
+            droneFilter = audioCtx.createBiquadFilter();
+            droneFilter.type = 'lowpass';
+            droneFilter.frequency.value = 250;
+
+            droneOsc.connect(oscGain1); oscGain1.connect(droneFilter);
+            droneOsc2.connect(oscGain2); oscGain2.connect(droneFilter);
+            droneFilter.connect(droneGain);
+            droneGain.connect(masterGain);
+            droneGain.connect(masterDelay);
+
+            droneOsc.start();
+            droneOsc2.start();
+
+            audioEnabled = true;
+        }
+
+        function playPluck(frequency, brightness, waveformType, panValue = 0, duration = 2.5) {
+            if (!audioEnabled || activePlucks >= maxVoices || isMuted) return;
+
+            activePlucks++;
+
+            if (hudPlucksEl) {
+                hudPlucksEl.innerText = 'ACTIVE';
+                hudPlucksEl.style.color = '#fff';
+                clearTimeout(pluckTimer);
+                pluckTimer = setTimeout(() => {
+                    hudPlucksEl.innerText = 'IDLE';
+                    hudPlucksEl.style.color = '#555';
+                }, 150);
+            }
+
+            const osc = audioCtx.createOscillator();
+            const gain = audioCtx.createGain();
+            const filter = audioCtx.createBiquadFilter();
+
+            let panner;
+            if (audioCtx.createStereoPanner) {
+                panner = audioCtx.createStereoPanner();
+                panner.pan.value = panValue;
+            } else {
+                panner = audioCtx.createGain();
+            }
+
+            osc.type = waveformType;
+
+            if (duration < 0.4 && Math.random() > 0.6) {
+                frequency *= 2;
+            }
+
+            if (Math.random() > 0.8 && duration > 0.5) {
+                osc.frequency.setValueAtTime(frequency * 0.85, audioCtx.currentTime); 
+                osc.frequency.exponentialRampToValueAtTime(frequency, audioCtx.currentTime + 0.15); 
+            } else {
+                osc.frequency.value = frequency;
+            }
+
+            filter.type = 'lowpass';
+            const clampedBrightness = Math.min(brightness, isMobile ? 1200 : 2000);
+            filter.frequency.setValueAtTime(clampedBrightness * 0.8, audioCtx.currentTime);
+            filter.frequency.exponentialRampToValueAtTime(Math.max(100, clampedBrightness * 0.1), audioCtx.currentTime + duration * 1.5);
+            filter.Q.value = 1.5; 
+
+            osc.connect(filter);
+            filter.connect(gain);
+            gain.connect(panner);
+            panner.connect(masterDelay);
+            panner.connect(masterGain);
+
+            osc.start();
+
+            gain.gain.setValueAtTime(0, audioCtx.currentTime);
+
+            const peakGain = Math.min(0.035, 0.015 + (brightness / 80000));
+            gain.gain.linearRampToValueAtTime(peakGain, audioCtx.currentTime + 0.35); 
+            gain.gain.exponentialRampToValueAtTime(0.0001, audioCtx.currentTime + duration * 2.0); 
+
+            osc.stop(audioCtx.currentTime + duration * 2.0);
+
+            osc.onended = () => {
+                activePlucks--;
+                osc.disconnect(); filter.disconnect(); gain.disconnect(); panner.disconnect();
+            };
+        }
+
+        function playDustSound(intensity, speed, panValue) {
+            if (!audioEnabled || activePlucks >= maxVoices || isMuted) return; 
+            if (Math.random() > 0.45) return; 
+
+            activePlucks++;
+
+            const osc = audioCtx.createOscillator();
+            const gain = audioCtx.createGain();
+            const filter = audioCtx.createBiquadFilter();
+
+            let panner;
+            if (audioCtx.createStereoPanner) {
+                panner = audioCtx.createStereoPanner();
+                panner.pan.value = panValue;
+            } else {
+                panner = audioCtx.createGain();
+            }
+
+            osc.type = 'triangle';
+
+            const scale = currentAudioProfile ? currentAudioProfile.scale : [261.63, 293.66, 329.63, 392.00, 440.00];
+            const overtoneFreq = scale[Math.floor(Math.random() * scale.length)];
+            osc.frequency.value = overtoneFreq * 2;
+
+            filter.type = 'bandpass';
+            filter.frequency.value = overtoneFreq * 2;
+            filter.Q.value = 4;
+
+            osc.connect(filter);
+            filter.connect(gain);
+            gain.connect(panner);
+            panner.connect(masterDelay);
+            panner.connect(masterGain);
+
+            osc.start();
+
+            gain.gain.setValueAtTime(0, audioCtx.currentTime);
+
+            const peakGain = Math.min(0.02, intensity * 0.006 + 0.002);
+            gain.gain.linearRampToValueAtTime(peakGain, audioCtx.currentTime + 0.1);
+            gain.gain.exponentialRampToValueAtTime(0.0001, audioCtx.currentTime + 1.5 + Math.random() * 1.5);
+
+            osc.stop(audioCtx.currentTime + 3.0);
+
+            osc.onended = () => {
+                activePlucks--;
+                osc.disconnect(); filter.disconnect(); gain.disconnect(); panner.disconnect();
+            };
+        }
+
+        window.addEventListener('beforeunload', () => {
+            if (masterGain && audioCtx) {
+                masterGain.gain.setValueAtTime(0, audioCtx.currentTime);
+            }
+            if (audioCtx) {
+                audioCtx.close();
+            }
+        });
+
+        init();
+        animate();
+    </script>
+</body>
+
+</html>
