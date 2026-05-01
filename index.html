@@ -105,45 +105,6 @@
             margin-bottom: 20px;
         }
 
-        /* AI Terminal Log */
-        #aiLogTerminal {
-            position: absolute;
-            bottom: 85px;
-            left: 50%;
-            transform: translateX(-50%) translateY(20px);
-            width: 90%;
-            max-width: 600px;
-            padding: 16px;
-            z-index: 150;
-            border-left: 4px solid #ffaa00;
-            opacity: 0;
-            pointer-events: none;
-            transition: opacity 0.4s ease, transform 0.4s ease, border-color 1s ease;
-        }
-
-        #aiLogTerminal.visible {
-            opacity: 1;
-            pointer-events: auto;
-            transform: translateX(-50%) translateY(0);
-        }
-
-        #aiLogTerminal h3 {
-            margin: 0 0 8px 0;
-            font-size: 0.75rem;
-            color: inherit;
-            letter-spacing: 2px;
-            transition: color 1s ease;
-        }
-
-        #aiLogText {
-            margin: 0;
-            font-size: 0.85rem;
-            line-height: 1.5;
-            color: rgba(255, 255, 255, 0.9);
-            font-family: 'Courier New', Courier, monospace;
-            text-transform: none;
-        }
-
         /* Playback Control Bar */
         #playbackControls {
             position: absolute;
@@ -617,13 +578,6 @@
                     style="flex:1; min-width: 0; margin: 0 10px;">
                 <span id="heightValue" style="width: 25px; text-align: right;">1.0</span>
             </div>
-            
-            <hr class="hud-divider" style="margin-top: 15px;">
-            <div style="margin-top: 10px;">
-                <span style="font-size: 0.68rem; color: rgba(255,255,255,0.8);">✨ AI THEME OVERRIDE</span>
-                <input type="text" id="aiThemeInput" placeholder="e.g. 'Neon dust storm'" style="width: 100%; box-sizing: border-box; background: rgba(0,0,0,0.5); border: 1px solid rgba(255,255,255,0.2); color: white; padding: 6px 8px; border-radius: 4px; font-size: 0.7rem; margin-top: 6px; outline: none; font-family: inherit;">
-                <button class="btn btn-small" id="aiThemeBtn" style="margin-top: 8px;">✨ REWEAVE LATTICE</button>
-            </div>
         </div>
     </div>
 
@@ -663,23 +617,6 @@
                 style="color: rgba(255, 255, 255, 0.5);">IDLE</span></div>
         <div class="hud-row"><span>Active Voices</span> <span class="hud-val highlight" id="hud-voices">0</span></div>
         <div class="hud-row"><span>Dust Particulates</span> <span class="hud-val" id="hud-dust">0</span></div>
-        
-        <hr class="hud-divider" style="margin-top: 10px;">
-        <div style="margin-top: 5px; display:flex; flex-direction:column; gap:6px;">
-            <span style="font-size: 0.68rem; color: rgba(255,255,255,0.8);">✨ LLM OVERRIDES</span>
-            <input type="text" id="aiMoodInput" placeholder="e.g. 'Haunted ruins'" style="width: 100%; box-sizing: border-box; background: rgba(0,0,0,0.5); border: 1px solid rgba(255,85,0,0.2); color: white; padding: 6px 8px; border-radius: 4px; font-size: 0.7rem; outline: none; font-family: inherit;">
-            <div style="display: flex; gap: 4px;">
-                <button class="btn btn-small" id="aiComposeBtn" style="margin: 0; padding: 6px 4px; font-size: 0.6rem;">✨ TUNE</button>
-                <button class="btn btn-small" id="aiRadioBtn" style="margin: 0; padding: 6px 4px; font-size: 0.6rem;">✨ RADIO</button>
-                <button class="btn btn-small" id="aiAnalyzeBtn" style="margin: 0; padding: 6px 4px; font-size: 0.6rem;">✨ LOG</button>
-            </div>
-        </div>
-    </div>
-
-    <!-- AI Output Terminal -->
-    <div id="aiLogTerminal" class="glass-panel">
-        <h3 id="uiTitleTerminal">✨ ARES SYS_LOG</h3>
-        <p id="aiLogText">Awaiting geometric analysis...</p>
     </div>
 
     <!-- Main Playback Controls -->
@@ -831,8 +768,7 @@
         // Dynamic UI colors
         const uiTitles = [
             document.getElementById('uiTitleLeft'),
-            document.getElementById('uiTitleRight'),
-            document.getElementById('uiTitleTerminal')
+            document.getElementById('uiTitleRight')
         ];
 
         // Sound Profiles & Visual Palettes per number, mapped to Martian Sunset theme
@@ -994,315 +930,7 @@
                 heightValue.innerText = heightFactor.toFixed(1);
             });
 
-            // --- AI Features Setup ---
-            document.getElementById('aiThemeBtn').addEventListener('click', handleThemeOverride);
-            document.getElementById('aiAnalyzeBtn').addEventListener('click', handleAnalyzeSector);
-            document.getElementById('aiComposeBtn').addEventListener('click', handleAudioOverride);
-            document.getElementById('aiRadioBtn').addEventListener('click', handleAudioLog);
-            
-            document.getElementById('aiLogTerminal').addEventListener('click', function() {
-                this.classList.remove('visible');
-            });
-
             startPreviewSequence();
-        }
-
-        // --- GEMINI API INTEGRATION ---
-        const apiKey = ""; 
-
-        async function fetchGemini(prompt, systemInstruction = "", jsonSchema = null) {
-            const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${apiKey}`;
-            const payload = {
-                contents: [{ parts: [{ text: prompt }] }],
-                systemInstruction: { parts: [{ text: systemInstruction }] }
-            };
-            
-            if (jsonSchema) {
-                payload.generationConfig = { 
-                    responseMimeType: "application/json",
-                    responseSchema: jsonSchema
-                };
-            }
-
-            let retries = 5;
-            let delay = 1000;
-            
-            for (let i = 0; i < retries; i++) {
-                try {
-                    const response = await fetch(url, {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify(payload)
-                    });
-                    
-                    if (!response.ok) {
-                        const errText = await response.text();
-                        throw new Error(`HTTP error! status: ${response.status}, message: ${errText}`);
-                    }
-                    
-                    const data = await response.json();
-                    return data.candidates?.[0]?.content?.parts?.[0]?.text || "";
-                } catch (e) {
-                    if (i === retries - 1) throw e;
-                    await new Promise(r => setTimeout(r, delay));
-                    delay *= 2;
-                }
-            }
-        }
-
-        async function fetchTTS(text, voice = "Charon") {
-            const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-tts:generateContent?key=${apiKey}`;
-            const payload = {
-                contents: [{ parts: [{ text: text }] }],
-                generationConfig: {
-                    responseModalities: ["AUDIO"],
-                    speechConfig: {
-                        voiceConfig: {
-                            prebuiltVoiceConfig: { voiceName: voice }
-                        }
-                    }
-                },
-                model: "gemini-2.5-flash-preview-tts"
-            };
-
-            let retries = 5;
-            let delay = 1000;
-            for (let i = 0; i < retries; i++) {
-                try {
-                    const response = await fetch(url, {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify(payload)
-                    });
-                    if (!response.ok) throw new Error(await response.text());
-                    return await response.json();
-                } catch (e) {
-                    if (i === retries - 1) throw e;
-                    await new Promise(r => setTimeout(r, delay));
-                    delay *= 2;
-                }
-            }
-        }
-
-        async function handleThemeOverride() {
-            const inputEl = document.getElementById('aiThemeInput');
-            const btnEl = document.getElementById('aiThemeBtn');
-            const themeQuery = inputEl.value.trim() || "neon dust storm";
-            
-            btnEl.innerText = "✨ GENERATING...";
-            btnEl.disabled = true;
-            
-            try {
-                const systemPrompt = "You are an expert UI/UX color theorist for a futuristic Martian generative art project. Return a JSON object with 4 hex colors based on the user's concept. 'g1' is the darkest rock shadow. 'g2' is the dusty soil background. 'edge' is a vibrant sunset or atmospheric glow. 'peak' is the absolute brightest solar flare/neon color.";
-                
-                const colorSchema = {
-                    type: "OBJECT",
-                    properties: {
-                        g1: { type: "STRING" },
-                        g2: { type: "STRING" },
-                        edge: { type: "STRING" },
-                        peak: { type: "STRING" }
-                    },
-                    required: ["g1", "g2", "edge", "peak"]
-                };
-
-                const responseText = await fetchGemini(`Generate a desert/martian color palette inspired by: "${themeQuery}"`, systemPrompt, colorSchema);
-                
-                const colors = JSON.parse(responseText);
-                
-                targetColorGrnd1.set(colors.g1);
-                targetColorGrnd2.set(colors.g2);
-                targetColorEdge.set(colors.edge);
-                targetColorPeak.set(colors.peak);
-
-                document.getElementById('colGrnd1').value = colors.g1;
-                document.getElementById('colGrnd2').value = colors.g2;
-                document.getElementById('colEdge').value = colors.edge;
-                document.getElementById('colPeak').value = colors.peak;
-                
-            } catch (err) {
-                console.error("Theme generation failed:", err);
-                inputEl.value = "Error generating theme.";
-            } finally {
-                btnEl.innerText = "✨ REWEAVE LATTICE";
-                btnEl.disabled = false;
-            }
-        }
-
-        async function handleAudioOverride() {
-            const inputEl = document.getElementById('aiMoodInput');
-            const btnEl = document.getElementById('aiComposeBtn');
-            const terminalEl = document.getElementById('aiLogTerminal');
-            const textEl = document.getElementById('aiLogText');
-            const mood = inputEl.value.trim() || "A tense standoff in a dust storm";
-
-            btnEl.innerText = "✨ TUNING...";
-            btnEl.disabled = true;
-
-            const audioSchema = {
-                type: "OBJECT",
-                properties: {
-                    name: { type: "STRING" },
-                    scale: { 
-                        type: "ARRAY", 
-                        items: { type: "NUMBER" }, 
-                        description: "Exactly 10 ascending frequencies in Hz representing a musical scale, between 100-1000Hz" 
-                    },
-                    drone: { type: "STRING", enum: ["sine", "square", "sawtooth", "triangle"] },
-                    pluck: { type: "STRING", enum: ["sine", "square", "sawtooth", "triangle"] }
-                },
-                required: ["name", "scale", "drone", "pluck"]
-            };
-
-            try {
-                const systemPrompt = "You are an avant-garde composer for a sci-fi generative audio project. Based on the user's mood, generate a custom musical scale and synth configuration.";
-                const responseText = await fetchGemini(`Compose an acoustic profile for: "${mood}"`, systemPrompt, audioSchema);
-                const audioConfig = JSON.parse(responseText);
-
-                if (audioConfig.scale && audioConfig.scale.length > 0) {
-                    currentAudioProfile.name = audioConfig.name;
-                    currentAudioProfile.scale = audioConfig.scale.slice(0, 10);
-                    while(currentAudioProfile.scale.length < 10) currentAudioProfile.scale.push(currentAudioProfile.scale[currentAudioProfile.scale.length-1] * 1.1);
-                    currentAudioProfile.drone = audioConfig.drone;
-                    currentAudioProfile.pluck = audioConfig.pluck;
-
-                    if (droneOsc) droneOsc.type = currentAudioProfile.drone;
-                    if (droneOsc2) droneOsc2.type = currentAudioProfile.drone;
-
-                    if (hudScaleEl) hudScaleEl.innerText = currentAudioProfile.name;
-                    if (hudFreqEl) hudFreqEl.innerText = `${currentAudioProfile.scale[0].toFixed(1)} Hz`;
-                    if (hudWaveEl) hudWaveEl.innerText = `${currentAudioProfile.drone} / ${currentAudioProfile.pluck}`;
-
-                    textEl.innerText = `SYS_UPDATE: Acoustic profile successfully retuned to "${currentAudioProfile.name}". Scale updated.`;
-                    terminalEl.classList.add('visible');
-                    setTimeout(() => terminalEl.classList.remove('visible'), 5000);
-                }
-            } catch (err) {
-                console.error("Tuning failed:", err);
-                textEl.innerText = "ERR_TUNE: Tuning failure.";
-                terminalEl.classList.add('visible');
-                setTimeout(() => terminalEl.classList.remove('visible'), 3000);
-            } finally {
-                btnEl.innerText = "✨ TUNE";
-                btnEl.disabled = false;
-            }
-        }
-
-        async function handleAudioLog() {
-            const btnEl = document.getElementById('aiRadioBtn');
-            const terminalEl = document.getElementById('aiLogTerminal');
-            const textEl = document.getElementById('aiLogText');
-
-            btnEl.innerText = "✨ RADIO...";
-            btnEl.disabled = true;
-
-            try {
-                // 1. Generate script
-                const inputEl = document.getElementById('aiMoodInput');
-                const mood = inputEl.value.trim() || "Dust storm";
-                const systemPrompt = "You are a lone astronaut on a desolated Mars base. Write a haunting, realistic 2-sentence radio transmission about your current state based on the user's prompt. Sound tired and melancholic. Use no quotes or emojis.";
-                
-                textEl.innerText = "Intercepting radio transmission...";
-                terminalEl.classList.add('visible');
-                
-                const scriptText = await fetchGemini(`Generate a radio log inspired by: ${mood}`, systemPrompt, null);
-
-                textEl.innerText = `RADIO LOG: "${scriptText}"`;
-
-                // 2. Generate Audio TTS
-                const ttsData = await fetchTTS(scriptText, "Charon");
-                const base64Audio = ttsData.candidates[0].content.parts[0].inlineData.data;
-                const mimeType = ttsData.candidates[0].content.parts[0].inlineData.mimeType;
-
-                let sampleRate = 24000;
-                const match = mimeType.match(/rate=(\d+)/);
-                if(match) sampleRate = parseInt(match[1]);
-
-                // 3. Decode L16 to AudioBuffer
-                const binaryString = atob(base64Audio);
-                const numSamples = binaryString.length / 2;
-                
-                // Initialize audio context if suspended
-                if (audioCtx && audioCtx.state === 'suspended') {
-                    await audioCtx.resume();
-                }
-
-                const audioBuffer = audioCtx.createBuffer(1, numSamples, sampleRate);
-                const channelData = audioBuffer.getChannelData(0);
-
-                for (let i = 0; i < numSamples; i++) {
-                    const byte1 = binaryString.charCodeAt(i * 2);
-                    const byte2 = binaryString.charCodeAt(i * 2 + 1);
-                    // L16 is Big Endian
-                    let int16 = (byte1 << 8) | byte2;
-                    if (int16 & 0x8000) int16 = int16 - 0x10000; // Sign extension
-                    channelData[i] = int16 / 32768.0;
-                }
-
-                // 4. Play with a radio effect
-                const source = audioCtx.createBufferSource();
-                source.buffer = audioBuffer;
-
-                // Add radio filter
-                const radioFilter = audioCtx.createBiquadFilter();
-                radioFilter.type = 'bandpass';
-                radioFilter.frequency.value = 1500;
-                radioFilter.Q.value = 1.0;
-
-                source.connect(radioFilter);
-                if (masterDelay) radioFilter.connect(masterDelay); 
-                if (masterGain) radioFilter.connect(masterGain);
-                else radioFilter.connect(audioCtx.destination);
-
-                source.start();
-
-                // Hide terminal after audio finishes (roughly)
-                setTimeout(() => {
-                    terminalEl.classList.remove('visible');
-                }, (numSamples / sampleRate) * 1000 + 4000);
-
-            } catch (err) {
-                console.error("Audio log failed:", err);
-                textEl.innerText = "ERR_RADIO_LOST: Failed to decode transmission. Signal heavily corrupted.";
-                terminalEl.classList.add('visible');
-                setTimeout(() => terminalEl.classList.remove('visible'), 5000);
-            } finally {
-                btnEl.innerText = "✨ RADIO";
-                btnEl.disabled = false;
-            }
-        }
-
-        async function handleAnalyzeSector() {
-            const btnEl = document.getElementById('aiAnalyzeBtn');
-            const terminalEl = document.getElementById('aiLogTerminal');
-            const textEl = document.getElementById('aiLogText');
-            
-            btnEl.innerText = "✨ SCANNING...";
-            btnEl.disabled = true;
-            
-            const currentScaleName = currentAudioProfile ? currentAudioProfile.name : "Unknown";
-            const resLvl = (lastKnownResonance * 100).toFixed(0);
-            const prompt = `Current Sol Cycle: ${currentNumber}. Musical Scale: ${currentScaleName}. Solar Wind Turbulence: ${targetTurbulence.toFixed(1)}. Spire Extension: ${heightFactor.toFixed(1)}. Solar Flare Level: ${resLvl}%.`;
-            
-            try {
-                const systemPrompt = "You are the AI Navigation System of a futuristic Mars Rover (the 'ARES' class). Write a cryptic, poetic, 2-sentence system diagnostic log analyzing the current state provided by the user. Combine sterile geo-technical jargon with expansive, arid desert aesthetics and passionate melancholic tango vibes. Do not use quotes.";
-                const responseText = await fetchGemini(prompt, systemPrompt, false);
-                
-                textEl.innerText = responseText;
-                terminalEl.classList.add('visible');
-                
-                setTimeout(() => {
-                    terminalEl.classList.remove('visible');
-                }, 12000);
-                
-            } catch (err) {
-                console.error("Analysis failed:", err);
-                textEl.innerText = "ERR_SONAR_LOST: The mainframe failed to parse the signal.";
-                terminalEl.classList.add('visible');
-            } finally {
-                btnEl.innerText = "✨ ANALYZE SECTOR";
-                btnEl.disabled = false;
-            }
         }
 
         function setupDust() {
@@ -1897,10 +1525,7 @@
 
                 if (colorFading) {
                     if (mouseLight) mouseLight.color.copy(colorPeak);
-                    if (document.getElementById('aiLogTerminal')) {
-                        document.getElementById('aiLogTerminal').style.borderColor = `rgb(${colorPeak.r*255}, ${colorPeak.g*255}, ${colorPeak.b*255})`;
-                    }
-                    updateDustColors();
+                    if (interactiveDust) interactiveDust.material.color.copy(colorPeak);
                 }
 
                 const speedMultiplier = 1.0 + (currentTurbulence - 1.0) * 0.8;
